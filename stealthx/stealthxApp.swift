@@ -24,6 +24,8 @@ struct StealthxApp: App {
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
+        NSApp.setActivationPolicy(.accessory)
+
         DispatchQueue.main.async {
             guard let window = NSApp.windows.first else { return }
 
@@ -45,7 +47,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
             window.alphaValue = 1.0
 
-            window.level = .floating
+            window.collectionBehavior = [
+                .canJoinAllSpaces,
+                .fullScreenAuxiliary,
+                .stationary,
+                .ignoresCycle,
+            ]
+            window.level = .screenSaver
+            window.orderFrontRegardless()
+            NSApp.activate(ignoringOtherApps: true)
         }
     }
 }
