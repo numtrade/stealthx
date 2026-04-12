@@ -35,6 +35,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             window.titleVisibility = .hidden
             window.titlebarAppearsTransparent = false
             window.isMovableByWindowBackground = true
+            window.hidesOnDeactivate = false
+            window.canHide = false
 
             window.backgroundColor = NSColor(
                 calibratedRed: 0.72,
@@ -44,12 +46,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             )
             window.isOpaque = true
             window.hasShadow = true
+            window.sharingType = .none
 
             window.alphaValue = 1.0
 
             window.collectionBehavior = [
                 .canJoinAllSpaces,
-                .fullScreenAuxiliary,
+                .canJoinAllApplications,
                 .stationary,
                 .ignoresCycle,
             ]
