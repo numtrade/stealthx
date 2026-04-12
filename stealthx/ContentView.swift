@@ -16,14 +16,11 @@ struct ContentView: View {
     private let transcriptPlaceholder =
         "Speaker transcript appears here after Start begins speaker-output capture."
     // Mock speaker-side transcript until backend wires live system-audio transcription.
-    private let mockSpeakerTranscriptLines = [
-        "00:00 Speaker: Starting speaker-output transcription demo.",
-        "00:01 Speaker: This transcript is hard-coded for the backend handoff.",
-        "00:03 Speaker: Replace these lines with live text generated from audio flowing to the speaker.",
-        "00:05 Speaker: Auto-follow should stay smooth while the transcript grows.",
-        "00:07 Speaker: If the user scrolls up to review older lines, live updates should not yank the view back down.",
-        "00:09 Speaker: Once the user returns near the bottom, new lines can resume following the latest audio.",
-        "00:11 Speaker: Backend hook point: swap this mocked stream for real speaker-output transcription events.",
+    private let mockSpeakerTranscriptParagraphs = [
+        "Starting speaker-output transcription demo so the backend team can see the intended flow clearly.",
+        "This transcript is still hard-coded for the handoff, but it now appears word by word like live text coming from the speaker output.",
+        "Replace this mocked stream with real speaker-output transcription events once the backend is ready.",
+        "Auto-follow should remain smooth as the transcript grows, and it should stop pulling the view when someone scrolls up to review older words.",
     ]
 
     var body: some View {
@@ -195,8 +192,8 @@ struct ContentView: View {
     private var editorFill: LinearGradient {
         LinearGradient(
             colors: [
-                Color(red: 0.93, green: 0.92, blue: 0.88),
-                Color(red: 0.86, green: 0.85, blue: 0.80),
+                Color(red: 0.96, green: 0.95, blue: 0.92),
+                Color(red: 0.90, green: 0.88, blue: 0.84),
             ],
             startPoint: .top,
             endPoint: .bottom
@@ -280,10 +277,10 @@ struct ContentView: View {
 
             if transcript.isEmpty {
                 Text(transcriptPlaceholder)
-                    .font(.system(size: 14))
+                    .font(.system(size: 13))
                     .foregroundStyle(transcriptTextColor)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 11)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 12)
                     .allowsHitTesting(false)
             }
         }
@@ -321,21 +318,42 @@ struct ContentView: View {
     private func startMockSpeakerTranscription() {
         transcriptTask?.cancel()
         transcriptTask = nil
-        transcript = ""
         isRecording = true
-        status = "Speaker -> Text"
+        status = "Transcribing"
+
+        guard !mockSpeakerTranscriptParagraphs.isEmpty else {
+            transcript = ""
+            return
+        }
+
+        let tokens = mockSpeakerTranscriptParagraphs.enumerated().flatMap { index, paragraph in
+            let words = paragraph.split(separator: " ").map(String.init)
+            if index < mockSpeakerTranscriptParagraphs.count - 1 {
+                return words + ["\n"]
+            } else {
+                return words
+            }
+        }
+
+        guard let firstToken = tokens.first else {
+            transcript = ""
+            return
+        }
+
+        transcript = firstToken
 
         transcriptTask = Task {
-            for (index, line) in mockSpeakerTranscriptLines.enumerated() {
-                let delay = index == 0 ? 250_000_000 : 850_000_000
-                try? await Task.sleep(nanoseconds: UInt64(delay))
+            for token in tokens.dropFirst() {
+                try? await Task.sleep(nanoseconds: mockTranscriptDelay(for: token))
                 guard !Task.isCancelled else { return }
 
                 await MainActor.run {
-                    if transcript.isEmpty {
-                        transcript = line
+                    if token == "\n" {
+                        transcript += "\n"
+                    } else if transcript.isEmpty || transcript.hasSuffix("\n") {
+                        transcript += token
                     } else {
-                        transcript += "\n" + line
+                        transcript += " " + token
                     }
                 }
             }
@@ -348,6 +366,22 @@ struct ContentView: View {
                 transcriptTask = nil
             }
         }
+    }
+
+    private func mockTranscriptDelay(for token: String) -> UInt64 {
+        if token == "\n" {
+            return 240_000_000
+        }
+
+        if token.hasSuffix(".") || token.hasSuffix("!") || token.hasSuffix("?") {
+            return 180_000_000
+        }
+
+        if token.hasSuffix(",") {
+            return 130_000_000
+        }
+
+        return 90_000_000
     }
 
     private func toggleMockSpeakerTranscription() {
@@ -397,6 +431,11 @@ struct ContentView: View {
 private struct TranscriptTextView: NSViewRepresentable {
     var text: String
 
+    private static let textInsets = NSSize(width: 14, height: 12)
+    private static let trailingGutter: CGFloat = 8
+    private static let font = NSFont.systemFont(ofSize: 13)
+    private static let textColor = NSColor(calibratedRed: 0.15, green: 0.14, blue: 0.12, alpha: 1.0)
+
     func makeCoordinator() -> Coordinator {
         Coordinator()
     }
@@ -411,26 +450,28 @@ private struct TranscriptTextView: NSViewRepresentable {
         scrollView.scrollerStyle = .overlay
         scrollView.contentView.postsBoundsChangedNotifications = true
 
-        let textView = NSTextView()
+        let textView = NSTextView(frame: NSRect(origin: .zero, size: scrollView.contentSize))
         textView.isEditable = false
         textView.isSelectable = false
         textView.drawsBackground = false
-        textView.font = .systemFont(ofSize: 14)
-        textView.textColor = NSColor(calibratedRed: 0.15, green: 0.14, blue: 0.12, alpha: 1.0)
-        textView.textContainerInset = NSSize(width: 10, height: 10)
+        textView.font = Self.font
+        textView.textColor = Self.textColor
+        textView.textContainerInset = Self.textInsets
         textView.textContainer?.lineFragmentPadding = 0
         textView.textContainer?.widthTracksTextView = true
         textView.textContainer?.containerSize = NSSize(
-            width: 0,
+            width: Self.containerWidth(for: scrollView.contentSize.width),
             height: CGFloat.greatestFiniteMagnitude
         )
+        textView.minSize = NSSize(width: 0, height: scrollView.contentSize.height)
         textView.isVerticallyResizable = true
         textView.isHorizontallyResizable = false
+        textView.autoresizingMask = [.width]
         textView.maxSize = NSSize(
             width: CGFloat.greatestFiniteMagnitude,
             height: CGFloat.greatestFiniteMagnitude
         )
-        textView.string = text
+        Self.applyStyledText(text, to: textView)
 
         scrollView.documentView = textView
 
@@ -443,9 +484,20 @@ private struct TranscriptTextView: NSViewRepresentable {
 
         let coordinator = context.coordinator
         let shouldFollowLatest = coordinator.shouldFollowLatest || coordinator.isNearBottom(scrollView)
+        let contentSize = scrollView.contentSize
+
+        if textView.frame.width != contentSize.width {
+            textView.setFrameSize(NSSize(width: contentSize.width, height: textView.frame.height))
+        }
+
+        textView.minSize = NSSize(width: 0, height: contentSize.height)
+        textView.textContainer?.containerSize = NSSize(
+            width: Self.containerWidth(for: contentSize.width),
+            height: CGFloat.greatestFiniteMagnitude
+        )
 
         if textView.string != text {
-            textView.string = text
+            Self.applyStyledText(text, to: textView)
         }
 
         if let textContainer = textView.textContainer,
@@ -462,6 +514,26 @@ private struct TranscriptTextView: NSViewRepresentable {
 
     static func dismantleNSView(_ scrollView: NSScrollView, coordinator: Coordinator) {
         coordinator.removeObservers()
+    }
+
+    private static func containerWidth(for contentWidth: CGFloat) -> CGFloat {
+        max(0, contentWidth - (textInsets.width * 2) - trailingGutter)
+    }
+
+    private static func applyStyledText(_ text: String, to textView: NSTextView) {
+        let paragraphStyle = NSMutableParagraphStyle()
+        paragraphStyle.lineBreakMode = .byWordWrapping
+        paragraphStyle.lineSpacing = 3
+
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: font,
+            .foregroundColor: textColor,
+            .paragraphStyle: paragraphStyle,
+        ]
+
+        textView.textStorage?.setAttributedString(
+            NSAttributedString(string: text, attributes: attributes)
+        )
     }
 
     final class Coordinator: NSObject {
