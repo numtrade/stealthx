@@ -7,12 +7,24 @@ struct ContentView: View {
     @State private var transcript = ""
     @State private var isRecording = false
     @State private var status = "Ready"
-    @FocusState private var editorFocused: Bool
+    @State private var transcriptTask: Task<Void, Never>?
 
     private let graphiteText = Color(red: 0.18, green: 0.18, blue: 0.15)
     private let macAccentColor = Color(red: 0.82, green: 0.29, blue: 0.22)
     private let unixAccentColor = Color(red: 0.13, green: 0.45, blue: 0.61)
     private let windowBackgroundColor = Color(red: 0.72, green: 0.72, blue: 0.68)
+    private let transcriptPlaceholder =
+        "Speaker transcript appears here after Start begins speaker-output capture."
+    // Mock speaker-side transcript until backend wires live system-audio transcription.
+    private let mockSpeakerTranscriptLines = [
+        "00:00 Speaker: Starting speaker-output transcription demo.",
+        "00:01 Speaker: This transcript is hard-coded for the backend handoff.",
+        "00:03 Speaker: Replace these lines with live text generated from audio flowing to the speaker.",
+        "00:05 Speaker: Auto-follow should stay smooth while the transcript grows.",
+        "00:07 Speaker: If the user scrolls up to review older lines, live updates should not yank the view back down.",
+        "00:09 Speaker: Once the user returns near the bottom, new lines can resume following the latest audio.",
+        "00:11 Speaker: Backend hook point: swap this mocked stream for real speaker-output transcription events.",
+    ]
 
     var body: some View {
         ZStack {
@@ -86,49 +98,30 @@ struct ContentView: View {
                         )
                 }
 
-                TextEditor(text: $transcript)
-                    .focused($editorFocused)
-                    .font(.system(size: 14))
-                    .foregroundColor(Color(red: 0.15, green: 0.14, blue: 0.12))
-                    .scrollContentBackground(.hidden)
-                    .padding(10)
-                    .background(
-                        RoundedRectangle(cornerRadius: 11, style: .continuous)
-                            .fill(editorFill)
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 11, style: .continuous)
-                            .stroke(editorBorderColor, lineWidth: 1)
-                    )
-                    .overlay(alignment: .top) {
-                        RoundedRectangle(cornerRadius: 0, style: .continuous)
-                            .stroke(Color.white.opacity(0.44), lineWidth: 1)
-                            .padding(1)
-                            .mask(
-                                LinearGradient(
-                                    colors: [Color.white, Color.white.opacity(0)],
-                                    startPoint: .top,
-                                    endPoint: .bottom
-                                )
-                            )
-                    }
+                transcriptPanel
 
-                HStack(spacing: 8) {
+                HStack(spacing: 4) {
                     Button {
-                        isRecording = true
-                        status = "Recording"
+                        toggleMockSpeakerTranscription()
                     } label: {
-                        Label("Start", systemImage: "speaker.wave.2.fill")
+                        Label(
+                            isRecording ? "Stop" : "Start",
+                            systemImage: isRecording ? "stop.fill" : "speaker.wave.2.fill"
+                        )
                     }
-                    .buttonStyle(StealthButtonStyle(kind: .primary, active: isRecording))
+                    .buttonStyle(
+                        StealthButtonStyle(
+                            kind: isRecording ? .danger : .primary,
+                            active: isRecording
+                        )
+                    )
 
                     Button {
-                        isRecording = false
-                        status = "Stopped"
+                        requestMockAnswer()
                     } label: {
-                        Label("Stop", systemImage: "stop.fill")
+                        Label("Answer", systemImage: "text.bubble.fill")
                     }
-                    .buttonStyle(StealthButtonStyle(kind: .danger))
+                    .buttonStyle(StealthButtonStyle())
 
                     Button {
                         let pasteboard = NSPasteboard.general
@@ -137,6 +130,13 @@ struct ContentView: View {
                         status = "Copied"
                     } label: {
                         Label("Copy", systemImage: "doc.on.doc")
+                    }
+                    .buttonStyle(StealthButtonStyle())
+
+                    Button {
+                        clearTranscript()
+                    } label: {
+                        Label("Clear", systemImage: "xmark.circle")
                     }
                     .buttonStyle(StealthButtonStyle())
 
@@ -152,10 +152,9 @@ struct ContentView: View {
                     .buttonStyle(StealthButtonStyle())
 
                     Button {
-                        editorFocused = true
-                        status = "Typing"
+                        status = "Mimic Type clicked"
                     } label: {
-                        Label("Type", systemImage: "keyboard")
+                        Label("Mimic Type", systemImage: "keyboard")
                     }
                     .buttonStyle(StealthButtonStyle())
 
@@ -274,6 +273,116 @@ struct ContentView: View {
         }
     }
 
+    private var transcriptPanel: some View {
+        ZStack(alignment: .topLeading) {
+            TranscriptTextView(text: transcript)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+
+            if transcript.isEmpty {
+                Text(transcriptPlaceholder)
+                    .font(.system(size: 14))
+                    .foregroundStyle(transcriptTextColor)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 11)
+                    .allowsHitTesting(false)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(
+            RoundedRectangle(cornerRadius: 11, style: .continuous)
+                .fill(editorFill)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 11, style: .continuous)
+                .stroke(editorBorderColor, lineWidth: 1)
+        )
+        .overlay(alignment: .top) {
+            RoundedRectangle(cornerRadius: 0, style: .continuous)
+                .stroke(Color.white.opacity(0.44), lineWidth: 1)
+                .padding(1)
+                .mask(
+                    LinearGradient(
+                        colors: [Color.white, Color.white.opacity(0)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+        }
+    }
+
+    private var transcriptTextColor: Color {
+        if transcript.isEmpty {
+            return Color(red: 0.42, green: 0.40, blue: 0.36)
+        } else {
+            return Color(red: 0.15, green: 0.14, blue: 0.12)
+        }
+    }
+
+    private func startMockSpeakerTranscription() {
+        transcriptTask?.cancel()
+        transcriptTask = nil
+        transcript = ""
+        isRecording = true
+        status = "Speaker -> Text"
+
+        transcriptTask = Task {
+            for (index, line) in mockSpeakerTranscriptLines.enumerated() {
+                let delay = index == 0 ? 250_000_000 : 850_000_000
+                try? await Task.sleep(nanoseconds: UInt64(delay))
+                guard !Task.isCancelled else { return }
+
+                await MainActor.run {
+                    if transcript.isEmpty {
+                        transcript = line
+                    } else {
+                        transcript += "\n" + line
+                    }
+                }
+            }
+
+            guard !Task.isCancelled else { return }
+
+            await MainActor.run {
+                isRecording = false
+                status = "Mock Complete"
+                transcriptTask = nil
+            }
+        }
+    }
+
+    private func toggleMockSpeakerTranscription() {
+        if isRecording {
+            stopMockSpeakerTranscription()
+        } else {
+            startMockSpeakerTranscription()
+        }
+    }
+
+    private func stopMockSpeakerTranscription() {
+        transcriptTask?.cancel()
+        transcriptTask = nil
+        isRecording = false
+        status = "Stopped"
+    }
+
+    private func requestMockAnswer() {
+        guard !transcript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            status = "No Transcript"
+            return
+        }
+
+        // Placeholder hook until backend turns transcript text into an actual answer flow.
+        status = "Answer Pending"
+    }
+
+    private func clearTranscript() {
+        transcriptTask?.cancel()
+        transcriptTask = nil
+        transcript = ""
+        isRecording = false
+        status = "Ready"
+    }
+
     private func brandPill(_ color: Color) -> some View {
         RoundedRectangle(cornerRadius: 1.5, style: .continuous)
             .fill(color)
@@ -282,6 +391,142 @@ struct ContentView: View {
                 RoundedRectangle(cornerRadius: 1.5, style: .continuous)
                     .stroke(Color.black.opacity(0.12), lineWidth: 0.5)
             )
+    }
+}
+
+private struct TranscriptTextView: NSViewRepresentable {
+    var text: String
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
+
+    func makeNSView(context: Context) -> NSScrollView {
+        let scrollView = NSScrollView()
+        scrollView.drawsBackground = false
+        scrollView.borderType = .noBorder
+        scrollView.hasVerticalScroller = true
+        scrollView.hasHorizontalScroller = false
+        scrollView.autohidesScrollers = true
+        scrollView.scrollerStyle = .overlay
+        scrollView.contentView.postsBoundsChangedNotifications = true
+
+        let textView = NSTextView()
+        textView.isEditable = false
+        textView.isSelectable = false
+        textView.drawsBackground = false
+        textView.font = .systemFont(ofSize: 14)
+        textView.textColor = NSColor(calibratedRed: 0.15, green: 0.14, blue: 0.12, alpha: 1.0)
+        textView.textContainerInset = NSSize(width: 10, height: 10)
+        textView.textContainer?.lineFragmentPadding = 0
+        textView.textContainer?.widthTracksTextView = true
+        textView.textContainer?.containerSize = NSSize(
+            width: 0,
+            height: CGFloat.greatestFiniteMagnitude
+        )
+        textView.isVerticallyResizable = true
+        textView.isHorizontallyResizable = false
+        textView.maxSize = NSSize(
+            width: CGFloat.greatestFiniteMagnitude,
+            height: CGFloat.greatestFiniteMagnitude
+        )
+        textView.string = text
+
+        scrollView.documentView = textView
+
+        context.coordinator.installObservers(for: scrollView)
+        return scrollView
+    }
+
+    func updateNSView(_ scrollView: NSScrollView, context: Context) {
+        guard let textView = scrollView.documentView as? NSTextView else { return }
+
+        let coordinator = context.coordinator
+        let shouldFollowLatest = coordinator.shouldFollowLatest || coordinator.isNearBottom(scrollView)
+
+        if textView.string != text {
+            textView.string = text
+        }
+
+        if let textContainer = textView.textContainer,
+            let layoutManager = textView.layoutManager {
+            layoutManager.ensureLayout(for: textContainer)
+        }
+
+        coordinator.shouldFollowLatest = shouldFollowLatest
+
+        guard shouldFollowLatest, !text.isEmpty else { return }
+
+        coordinator.scrollToBottom(in: scrollView, animated: true)
+    }
+
+    static func dismantleNSView(_ scrollView: NSScrollView, coordinator: Coordinator) {
+        coordinator.removeObservers()
+    }
+
+    final class Coordinator: NSObject {
+        private let bottomThreshold: CGFloat = 24
+        private var observedClipView: NSClipView?
+        var shouldFollowLatest = true
+
+        func installObservers(for scrollView: NSScrollView) {
+            removeObservers()
+            observedClipView = scrollView.contentView
+            NotificationCenter.default.addObserver(
+                self,
+                selector: #selector(handleBoundsChange),
+                name: NSView.boundsDidChangeNotification,
+                object: scrollView.contentView
+            )
+        }
+
+        func removeObservers() {
+            if let observedClipView {
+                NotificationCenter.default.removeObserver(
+                    self,
+                    name: NSView.boundsDidChangeNotification,
+                    object: observedClipView
+                )
+            }
+            observedClipView = nil
+        }
+
+        func isNearBottom(_ scrollView: NSScrollView) -> Bool {
+            let visibleMaxY = scrollView.contentView.bounds.maxY
+            let documentHeight = scrollView.documentView?.bounds.height ?? 0
+            return documentHeight - visibleMaxY <= bottomThreshold
+        }
+
+        func scrollToBottom(in scrollView: NSScrollView, animated: Bool) {
+            guard let documentView = scrollView.documentView else { return }
+
+            let targetY = max(0, documentView.bounds.height - scrollView.contentView.bounds.height)
+            let targetPoint = NSPoint(x: 0, y: targetY)
+
+            if animated {
+                NSAnimationContext.runAnimationGroup { context in
+                    context.duration = 0.16
+                    context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+                    scrollView.contentView.animator().setBoundsOrigin(targetPoint)
+                } completionHandler: {
+                    scrollView.reflectScrolledClipView(scrollView.contentView)
+                }
+            } else {
+                scrollView.contentView.setBoundsOrigin(targetPoint)
+                scrollView.reflectScrolledClipView(scrollView.contentView)
+            }
+        }
+
+        @objc private func handleBoundsChange(_ notification: Notification) {
+            guard let clipView = notification.object as? NSClipView,
+                let scrollView = clipView.superview as? NSScrollView else { return }
+
+            shouldFollowLatest = isNearBottom(scrollView)
+        }
+
+        deinit {
+            removeObservers()
+        }
     }
 }
 
@@ -294,14 +539,18 @@ enum StealthButtonKind {
 struct StealthButtonStyle: ButtonStyle {
     var kind: StealthButtonKind = .normal
     var active: Bool = false
+    var width: CGFloat = 90
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.system(size: 12, weight: .semibold))
+            .font(.system(size: 10.5, weight: .semibold))
+            .imageScale(.small)
+            .lineLimit(1)
+            .minimumScaleFactor(0.78)
             .foregroundStyle(foregroundColor(configuration: configuration))
-            .padding(.horizontal, 14)
-            .padding(.vertical, 7)
-            .frame(minWidth: 74)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 6)
+            .frame(width: width)
             .background(
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
                     .fill(backgroundFill(configuration: configuration))
