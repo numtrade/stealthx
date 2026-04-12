@@ -118,7 +118,7 @@ struct ContentView: View {
                         isRecording = true
                         status = "Recording"
                     } label: {
-                        Label("Start", systemImage: "mic.fill")
+                        Label("Start", systemImage: "speaker.wave.2.fill")
                     }
                     .buttonStyle(StealthButtonStyle(kind: .primary, active: isRecording))
 
