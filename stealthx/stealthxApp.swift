@@ -1,6 +1,10 @@
 import SwiftUI
 import AppKit
 
+private enum WindowMetrics {
+    static let contentSize = NSSize(width: 420, height: 300)
+}
+
 @main
 struct StealthxApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
@@ -8,9 +12,13 @@ struct StealthxApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
-                .frame(width: 420, height: 300)
+                .frame(
+                    width: WindowMetrics.contentSize.width,
+                    height: WindowMetrics.contentSize.height
+                )
         }
         .windowStyle(.hiddenTitleBar)
+        .windowResizability(.contentSize)
     }
 }
 
@@ -19,6 +27,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         DispatchQueue.main.async {
             guard let window = NSApp.windows.first else { return }
 
+            window.setContentSize(WindowMetrics.contentSize)
+            window.contentMinSize = WindowMetrics.contentSize
+            window.contentMaxSize = WindowMetrics.contentSize
             window.titleVisibility = .hidden
             window.titlebarAppearsTransparent = false
             window.isMovableByWindowBackground = true
