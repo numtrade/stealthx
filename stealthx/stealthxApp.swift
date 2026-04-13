@@ -38,12 +38,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             window.hidesOnDeactivate = false
             window.canHide = false
 
-            window.backgroundColor = NSColor(
-                calibratedRed: 0.72,
-                green: 0.72,
-                blue: 0.68,
-                alpha: 1.0
-            )
+            window.backgroundColor = NSColor.windowBackgroundColor
             window.isOpaque = true
             window.hasShadow = true
             window.sharingType = .none

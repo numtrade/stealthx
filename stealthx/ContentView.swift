@@ -9,12 +9,10 @@ struct ContentView: View {
     @State private var status = "Ready"
     @State private var transcriptTask: Task<Void, Never>?
 
-    private let graphiteText = Color(red: 0.18, green: 0.18, blue: 0.15)
-    private let macAccentColor = Color(red: 0.82, green: 0.29, blue: 0.22)
-    private let unixAccentColor = Color(red: 0.13, green: 0.45, blue: 0.61)
-    private let windowBackgroundColor = Color(red: 0.72, green: 0.72, blue: 0.68)
     private let transcriptPlaceholder =
         "Speaker transcript appears here after Start begins speaker-output capture."
+    private let actionButtonWidth: CGFloat = 92
+    private let secondaryActionButtonWidth: CGFloat = 126
     // Mock speaker-side transcript until backend wires live system-audio transcription.
     private let mockSpeakerTranscriptParagraphs = [
         "Starting speaker-output transcription demo so the backend team can see the intended flow clearly.",
@@ -25,100 +23,35 @@ struct ContentView: View {
 
     var body: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(panelFill)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .stroke(panelBorderColor, lineWidth: 1)
-                )
-                .overlay(alignment: .top) {
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .stroke(Color.white.opacity(0.48), lineWidth: 1)
-                        .padding(1)
-                        .mask(
-                            LinearGradient(
-                                colors: [Color.white, Color.white.opacity(0)],
-                                startPoint: .top,
-                                endPoint: .bottom
-                            )
-                        )
-                }
-                .shadow(color: .black.opacity(0.18), radius: 10, x: 0, y: 6)
+            Color(nsColor: .windowBackgroundColor)
+                .ignoresSafeArea()
 
-            VStack(spacing: 14) {
-                HStack(spacing: 10) {
-                    ZStack {
-                        Circle()
-                            .fill(
-                                LinearGradient(
-                                    colors: [
-                                        Color.white.opacity(0.58),
-                                        Color.black.opacity(0.08),
-                                    ],
-                                    startPoint: .top,
-                                    endPoint: .bottom
-                                )
-                            )
-
-                        Circle()
-                            .fill(recordIndicatorFill)
-                            .padding(2.5)
-                    }
-                    .frame(width: 14, height: 14)
-                    .overlay(
-                        Circle()
-                            .stroke(Color.black.opacity(0.35), lineWidth: 1)
-                    )
-                    .shadow(color: .white.opacity(0.28), radius: 0, x: 0, y: 1)
-
-                    brandView
-
-                    Spacer()
-
-                    Text(status)
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(statusTextColor)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 4)
-                        .background(
-                            RoundedRectangle(cornerRadius: 7, style: .continuous)
-                                .fill(statusFill)
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 7, style: .continuous)
-                                .stroke(Color.black.opacity(0.22), lineWidth: 1)
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                .stroke(Color.white.opacity(0.42), lineWidth: 1)
-                                .padding(1)
-                        )
-                }
+            VStack(spacing: 12) {
+                headerView
 
                 transcriptPanel
 
-                HStack(spacing: 4) {
+                HStack(spacing: 8) {
                     Button {
                         toggleMockSpeakerTranscription()
                     } label: {
-                        Label(
+                        actionButtonLabel(
                             isRecording ? "Stop" : "Start",
-                            systemImage: isRecording ? "stop.fill" : "speaker.wave.2.fill"
+                            systemImage: isRecording ? "stop.fill" : "waveform"
                         )
                     }
-                    .buttonStyle(
-                        StealthButtonStyle(
-                            kind: isRecording ? .danger : .primary,
-                            active: isRecording
-                        )
-                    )
+                    .frame(width: actionButtonWidth)
+                    .buttonStyle(.bordered)
+                    .controlSize(.regular)
 
                     Button {
                         requestMockAnswer()
                     } label: {
-                        Label("Answer", systemImage: "text.bubble.fill")
+                        actionButtonLabel("Answer", systemImage: "text.bubble.fill")
                     }
-                    .buttonStyle(StealthButtonStyle())
+                    .frame(width: actionButtonWidth)
+                    .buttonStyle(.bordered)
+                    .controlSize(.regular)
 
                     Button {
                         let pasteboard = NSPasteboard.general
@@ -126,42 +59,48 @@ struct ContentView: View {
                         pasteboard.setString(transcript, forType: .string)
                         status = "Copied"
                     } label: {
-                        Label("Copy", systemImage: "doc.on.doc")
+                        actionButtonLabel("Copy", systemImage: "doc.on.doc")
                     }
-                    .buttonStyle(StealthButtonStyle())
+                    .frame(width: actionButtonWidth)
+                    .buttonStyle(.bordered)
+                    .controlSize(.regular)
 
                     Button {
                         clearTranscript()
                     } label: {
-                        Label("Clear", systemImage: "xmark.circle")
+                        actionButtonLabel("Clear", systemImage: "xmark.circle")
                     }
-                    .buttonStyle(StealthButtonStyle())
+                    .frame(width: actionButtonWidth)
+                    .buttonStyle(.bordered)
+                    .controlSize(.regular)
 
-                    Spacer()
+                    Spacer(minLength: 0)
                 }
 
                 HStack(spacing: 8) {
                     Button {
                         status = "Screenshot clicked"
                     } label: {
-                        Label("Screenshot", systemImage: "camera.viewfinder")
+                        actionButtonLabel("Screenshot", systemImage: "camera.viewfinder")
                     }
-                    .buttonStyle(StealthButtonStyle())
+                    .frame(width: secondaryActionButtonWidth)
+                    .buttonStyle(.bordered)
+                    .controlSize(.regular)
 
                     Button {
                         status = "Mimic Type clicked"
                     } label: {
-                        Label("Mimic Type", systemImage: "keyboard")
+                        actionButtonLabel("Mimic Type", systemImage: "keyboard")
                     }
-                    .buttonStyle(StealthButtonStyle())
+                    .frame(width: secondaryActionButtonWidth)
+                    .buttonStyle(.bordered)
+                    .controlSize(.regular)
 
-                    Spacer()
+                    Spacer(minLength: 0)
                 }
             }
-            .padding(16)
+            .padding(14)
         }
-        .padding(8)
-        .background(windowBackgroundColor)
         .overlay {
             if showsWindowBounds {
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
@@ -173,100 +112,41 @@ struct ContentView: View {
         }
     }
 
-    private var panelFill: LinearGradient {
-        LinearGradient(
-            colors: [
-                Color(red: 0.89, green: 0.89, blue: 0.85),
-                Color(red: 0.78, green: 0.78, blue: 0.74),
-                Color(red: 0.66, green: 0.66, blue: 0.62),
-            ],
-            startPoint: .top,
-            endPoint: .bottom
-        )
+    private var primaryTextColor: Color {
+        Color(nsColor: .labelColor)
     }
 
-    private var panelBorderColor: Color {
-        Color(red: 0.38, green: 0.38, blue: 0.34)
+    private var secondaryTextColor: Color {
+        Color(nsColor: .secondaryLabelColor)
     }
 
-    private var editorFill: LinearGradient {
-        LinearGradient(
-            colors: [
-                Color(red: 0.96, green: 0.95, blue: 0.92),
-                Color(red: 0.90, green: 0.88, blue: 0.84),
-            ],
-            startPoint: .top,
-            endPoint: .bottom
-        )
+    private var panelStroke: Color {
+        primaryTextColor.opacity(0.08)
     }
 
-    private var editorBorderColor: Color {
-        Color(red: 0.47, green: 0.46, blue: 0.42)
+    private var transcriptBackgroundColor: Color {
+        Color(nsColor: .textBackgroundColor).opacity(0.9)
     }
 
-    private var recordIndicatorFill: LinearGradient {
-        if isRecording {
-            return LinearGradient(
-                colors: [
-                    Color(red: 0.95, green: 0.40, blue: 0.38),
-                    Color(red: 0.58, green: 0.12, blue: 0.10),
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-        } else {
-            return LinearGradient(
-                colors: [
-                    Color(red: 0.80, green: 0.80, blue: 0.77),
-                    Color(red: 0.53, green: 0.53, blue: 0.49),
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-        }
+    private var indicatorColor: Color {
+        isRecording ? Color(nsColor: .systemRed) : Color.gray.opacity(0.5)
     }
 
-    private var statusFill: LinearGradient {
-        if isRecording {
-            return LinearGradient(
-                colors: [
-                    Color(red: 0.97, green: 0.79, blue: 0.78),
-                    Color(red: 0.75, green: 0.48, blue: 0.46),
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-        } else {
-            return LinearGradient(
-                colors: [
-                    Color(red: 0.93, green: 0.92, blue: 0.88),
-                    Color(red: 0.77, green: 0.76, blue: 0.71),
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-        }
-    }
-
-    private var statusTextColor: Color {
-        if isRecording {
-            return Color(red: 0.35, green: 0.08, blue: 0.08)
-        } else {
-            return Color(red: 0.29, green: 0.28, blue: 0.25)
-        }
-    }
-
-    private var brandView: some View {
+    private var headerView: some View {
         HStack(spacing: 8) {
+            Circle()
+                .fill(indicatorColor)
+                .frame(width: 8, height: 8)
 
-            HStack(spacing: 0) {
-                Text("Mac")
-                    .foregroundStyle(macAccentColor)
-                Text("Unix")
-                    .foregroundStyle(unixAccentColor)
-            }
-            .font(.system(size: 18, weight: .semibold))
-            .tracking(0.2)
+            Text("MacUnix")
+                .font(.headline)
+                .foregroundStyle(primaryTextColor)
+
+            Spacer()
+
+            Text(status)
+                .font(.caption)
+                .foregroundStyle(secondaryTextColor)
         }
     }
 
@@ -277,42 +157,38 @@ struct ContentView: View {
 
             if transcript.isEmpty {
                 Text(transcriptPlaceholder)
-                    .font(.system(size: 13))
+                    .font(.system(size: 14, weight: .regular))
                     .foregroundStyle(transcriptTextColor)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 12)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 10)
                     .allowsHitTesting(false)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(
-            RoundedRectangle(cornerRadius: 11, style: .continuous)
-                .fill(editorFill)
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(transcriptBackgroundColor)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 11, style: .continuous)
-                .stroke(editorBorderColor, lineWidth: 1)
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(panelStroke, lineWidth: 1)
         )
-        .overlay(alignment: .top) {
-            RoundedRectangle(cornerRadius: 0, style: .continuous)
-                .stroke(Color.white.opacity(0.44), lineWidth: 1)
-                .padding(1)
-                .mask(
-                    LinearGradient(
-                        colors: [Color.white, Color.white.opacity(0)],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                )
-        }
     }
 
     private var transcriptTextColor: Color {
         if transcript.isEmpty {
-            return Color(red: 0.42, green: 0.40, blue: 0.36)
+            return secondaryTextColor
         } else {
-            return Color(red: 0.15, green: 0.14, blue: 0.12)
+            return primaryTextColor
         }
+    }
+
+    private func actionButtonLabel(_ title: String, systemImage: String) -> some View {
+        Label(title, systemImage: systemImage)
+            .font(.system(size: 12, weight: .regular))
+            .imageScale(.medium)
+            .lineLimit(1)
+            .frame(maxWidth: .infinity)
     }
 
     private func startMockSpeakerTranscription() {
@@ -417,24 +293,15 @@ struct ContentView: View {
         status = "Ready"
     }
 
-    private func brandPill(_ color: Color) -> some View {
-        RoundedRectangle(cornerRadius: 1.5, style: .continuous)
-            .fill(color)
-            .frame(width: 4, height: 11)
-            .overlay(
-                RoundedRectangle(cornerRadius: 1.5, style: .continuous)
-                    .stroke(Color.black.opacity(0.12), lineWidth: 0.5)
-            )
-    }
 }
 
 private struct TranscriptTextView: NSViewRepresentable {
     var text: String
 
-    private static let textInsets = NSSize(width: 14, height: 12)
-    private static let trailingGutter: CGFloat = 8
-    private static let font = NSFont.systemFont(ofSize: 13)
-    private static let textColor = NSColor(calibratedRed: 0.15, green: 0.14, blue: 0.12, alpha: 1.0)
+    private static let textInsets = NSSize(width: 10, height: 10)
+    private static let trailingGutter: CGFloat = 10
+    private static let font = NSFont.systemFont(ofSize: 14)
+    private static let textColor = NSColor.labelColor
 
     func makeCoordinator() -> Coordinator {
         Coordinator()
@@ -602,156 +469,10 @@ private struct TranscriptTextView: NSViewRepresentable {
     }
 }
 
-enum StealthButtonKind {
-    case normal
-    case primary
-    case danger
-}
-
-struct StealthButtonStyle: ButtonStyle {
-    var kind: StealthButtonKind = .normal
-    var active: Bool = false
-    var width: CGFloat = 90
-
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(.system(size: 10.5, weight: .semibold))
-            .imageScale(.small)
-            .lineLimit(1)
-            .minimumScaleFactor(0.78)
-            .foregroundStyle(foregroundColor(configuration: configuration))
-            .padding(.horizontal, 8)
-            .padding(.vertical, 6)
-            .frame(width: width)
-            .background(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(backgroundFill(configuration: configuration))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .stroke(borderColor(configuration: configuration), lineWidth: 1)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 7, style: .continuous)
-                    .stroke(innerHighlightColor(configuration: configuration), lineWidth: 1)
-                    .padding(1)
-            )
-            .shadow(
-                color: Color.black.opacity(configuration.isPressed ? 0.08 : 0.18),
-                radius: 0,
-                x: 0,
-                y: 1
-            )
-            .offset(y: configuration.isPressed ? 1 : 0)
-            .animation(.easeOut(duration: 0.08), value: configuration.isPressed)
-    }
-
-    private func foregroundColor(configuration: Configuration) -> Color {
-        switch kind {
-        case .primary where active:
-            return Color(red: 0.31, green: 0.09, blue: 0.09)
-        case .danger:
-            return Color(red: 0.20, green: 0.18, blue: 0.16)
-        case .primary, .normal:
-            return Color(red: 0.18, green: 0.18, blue: 0.16)
-        }
-    }
-
-    private func backgroundFill(configuration: Configuration) -> LinearGradient {
-        switch kind {
-        case .primary where active:
-            return LinearGradient(
-                colors: [
-                    Color(
-                        red: configuration.isPressed ? 0.84 : 0.95,
-                        green: configuration.isPressed ? 0.50 : 0.68,
-                        blue: configuration.isPressed ? 0.49 : 0.70
-                    ),
-                    Color(
-                        red: configuration.isPressed ? 0.58 : 0.72,
-                        green: configuration.isPressed ? 0.22 : 0.28,
-                        blue: configuration.isPressed ? 0.20 : 0.27
-                    ),
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-        case .danger:
-            return LinearGradient(
-                colors: [
-                    Color(
-                        red: configuration.isPressed ? 0.79 : 0.90,
-                        green: configuration.isPressed ? 0.78 : 0.88,
-                        blue: configuration.isPressed ? 0.73 : 0.82
-                    ),
-                    Color(
-                        red: configuration.isPressed ? 0.63 : 0.74,
-                        green: configuration.isPressed ? 0.62 : 0.71,
-                        blue: configuration.isPressed ? 0.58 : 0.64
-                    ),
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-        case .primary, .normal:
-            return LinearGradient(
-                colors: [
-                    Color(
-                        red: configuration.isPressed ? 0.83 : 0.95,
-                        green: configuration.isPressed ? 0.83 : 0.94,
-                        blue: configuration.isPressed ? 0.79 : 0.90
-                    ),
-                    Color(
-                        red: configuration.isPressed ? 0.68 : 0.78,
-                        green: configuration.isPressed ? 0.68 : 0.77,
-                        blue: configuration.isPressed ? 0.65 : 0.72
-                    ),
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-        }
-    }
-
-    private func borderColor(configuration: Configuration) -> Color {
-        switch kind {
-        case .primary where active:
-            return Color(
-                red: configuration.isPressed ? 0.39 : 0.47,
-                green: configuration.isPressed ? 0.10 : 0.12,
-                blue: configuration.isPressed ? 0.10 : 0.11
-            )
-        case .danger:
-            return Color(
-                red: configuration.isPressed ? 0.36 : 0.43,
-                green: configuration.isPressed ? 0.35 : 0.40,
-                blue: configuration.isPressed ? 0.31 : 0.34
-            )
-        case .primary, .normal:
-            return Color(
-                red: configuration.isPressed ? 0.39 : 0.46,
-                green: configuration.isPressed ? 0.39 : 0.44,
-                blue: configuration.isPressed ? 0.35 : 0.39
-            )
-        }
-    }
-
-    private func innerHighlightColor(configuration: Configuration) -> Color {
-        switch kind {
-        case .primary where active:
-            return Color.white.opacity(configuration.isPressed ? 0.22 : 0.40)
-        case .danger:
-            return Color.white.opacity(configuration.isPressed ? 0.24 : 0.46)
-        case .primary, .normal:
-            return Color.white.opacity(configuration.isPressed ? 0.28 : 0.54)
-        }
-    }
-}
-
 struct ContentView_Previews: PreviewProvider {
     static var previews: some View {
         ContentView(showsWindowBounds: true)
             .frame(width: 420, height: 300)
-            .background(Color.gray.opacity(0.18))
+            .background(Color(nsColor: .windowBackgroundColor))
     }
 }
