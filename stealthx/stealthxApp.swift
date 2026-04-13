@@ -11,7 +11,7 @@ struct StealthxApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            ContentView()   
                 .frame(
                     width: WindowMetrics.contentSize.width,
                     height: WindowMetrics.contentSize.height
