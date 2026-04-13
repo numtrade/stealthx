@@ -6,3 +6,4 @@ DerivedData/
 *.xcscmblueprint
 xcuserdata/
 **/xcuserdata/
+**/project.xcworkspace/xcshareddata/
