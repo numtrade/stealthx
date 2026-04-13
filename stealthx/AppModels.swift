@@ -9,6 +9,7 @@ enum OverlayAction: CaseIterable, Identifiable {
     case clearTranscript
     case captureScreenshot
     case mimicType
+    case mirrorWindow
 
     static let primaryRow: [Self] = [
         .toggleTranscription,
@@ -64,6 +65,12 @@ enum OverlayAction: CaseIterable, Identifiable {
             return ActionButtonPresentation(
                 title: "Mimic Type",
                 systemImage: "keyboard",
+                width: secondaryWidth
+            )
+        case .mirrorWindow:
+            return ActionButtonPresentation(
+                title: "Mirror Window",
+                systemImage: "rectangle.on.rectangle",
                 width: secondaryWidth
             )
         }

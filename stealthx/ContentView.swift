@@ -90,9 +90,16 @@ struct ContentView: View {
 
             Spacer()
 
+            ActionButton(
+                presentation: headerActionPresentation(for: .mirrorWindow),
+                perform: { perform(.mirrorWindow) },
+                controlSize: .small
+            )
+
             Text(status)
                 .font(.caption)
                 .foregroundStyle(secondaryTextColor)
+                .lineLimit(1)
         }
     }
 
@@ -137,6 +144,14 @@ struct ContentView: View {
         )
     }
 
+    private func headerActionPresentation(for action: OverlayAction) -> ActionButtonPresentation {
+        action.presentation(
+            isRecording: isRecording,
+            primaryWidth: actionButtonWidth,
+            secondaryWidth: 120
+        )
+    }
+
     private func perform(_ action: OverlayAction) {
         switch action {
         case .toggleTranscription:
@@ -148,9 +163,11 @@ struct ContentView: View {
         case .clearTranscript:
             clearTranscript()
         case .captureScreenshot:
-            status = "Screenshot clicked"
+            captureScreenshot()
         case .mimicType:
-            status = "Mimic Type clicked"
+            triggerMimicType()
+        case .mirrorWindow:
+            beginMirrorWindowSetup()
         }
     }
 
@@ -263,6 +280,37 @@ struct ContentView: View {
         status = "Ready"
     }
 
+    private func captureScreenshot() {
+        status = "Screenshot clicked"
+    }
+
+    private func triggerMimicType() {
+        status = "Mimic Type clicked"
+    }
+
+    private func beginMirrorWindowSetup() {
+        // Future hook: open the mirror-window flow and let the backend provide
+        // exclusion controls for anything that should stay out of the mirrored view.
+        status = "Mirror Setup Pending"
+    }
+
+}
+
+private struct ActionButton: View {
+    let presentation: ActionButtonPresentation
+    let perform: () -> Void
+    var controlSize: ControlSize = .regular
+
+    var body: some View {
+        Button {
+            perform()
+        } label: {
+            ActionButtonLabel(presentation: presentation)
+        }
+        .frame(width: presentation.width)
+        .buttonStyle(.bordered)
+        .controlSize(controlSize)
+    }
 }
 
 private struct ActionButtonRow: View {
@@ -273,16 +321,10 @@ private struct ActionButtonRow: View {
     var body: some View {
         HStack(spacing: 8) {
             ForEach(actions) { action in
-                let button = presentation(action)
-
-                Button {
-                    perform(action)
-                } label: {
-                    ActionButtonLabel(presentation: button)
-                }
-                .frame(width: button.width)
-                .buttonStyle(.bordered)
-                .controlSize(.regular)
+                ActionButton(
+                    presentation: presentation(action),
+                    perform: { perform(action) }
+                )
             }
 
             Spacer(minLength: 0)
