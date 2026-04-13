@@ -7,3 +7,6 @@ DerivedData/
 xcuserdata/
 **/xcuserdata/
 **/project.xcworkspace/xcshareddata/
+
+# Ignore accidental nested project copies from folder moves.
+stealthx/stealthx.xcodeproj/
