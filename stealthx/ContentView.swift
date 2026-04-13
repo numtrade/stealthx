@@ -13,6 +13,8 @@ struct ContentView: View {
         "Speaker transcript appears here after Start begins speaker-output capture."
     private let actionButtonWidth: CGFloat = 92
     private let secondaryActionButtonWidth: CGFloat = 126
+    private let primaryActions = OverlayAction.primaryRow
+    private let secondaryActions = OverlayAction.secondaryRow
     // Mock speaker-side transcript until backend wires live system-audio transcription.
     private let mockSpeakerTranscriptParagraphs = [
         "Starting speaker-output transcription demo so the backend team can see the intended flow clearly.",
@@ -31,73 +33,17 @@ struct ContentView: View {
 
                 transcriptPanel
 
-                HStack(spacing: 8) {
-                    Button {
-                        toggleMockSpeakerTranscription()
-                    } label: {
-                        actionButtonLabel(
-                            isRecording ? "Stop" : "Start",
-                            systemImage: isRecording ? "stop.fill" : "waveform"
-                        )
-                    }
-                    .frame(width: actionButtonWidth)
-                    .buttonStyle(.bordered)
-                    .controlSize(.regular)
+                ActionButtonRow(
+                    actions: primaryActions,
+                    presentation: actionPresentation(for:),
+                    perform: perform
+                )
 
-                    Button {
-                        requestMockAnswer()
-                    } label: {
-                        actionButtonLabel("Answer", systemImage: "text.bubble.fill")
-                    }
-                    .frame(width: actionButtonWidth)
-                    .buttonStyle(.bordered)
-                    .controlSize(.regular)
-
-                    Button {
-                        let pasteboard = NSPasteboard.general
-                        pasteboard.clearContents()
-                        pasteboard.setString(transcript, forType: .string)
-                        status = "Copied"
-                    } label: {
-                        actionButtonLabel("Copy", systemImage: "doc.on.doc")
-                    }
-                    .frame(width: actionButtonWidth)
-                    .buttonStyle(.bordered)
-                    .controlSize(.regular)
-
-                    Button {
-                        clearTranscript()
-                    } label: {
-                        actionButtonLabel("Clear", systemImage: "xmark.circle")
-                    }
-                    .frame(width: actionButtonWidth)
-                    .buttonStyle(.bordered)
-                    .controlSize(.regular)
-
-                    Spacer(minLength: 0)
-                }
-
-                HStack(spacing: 8) {
-                    Button {
-                        status = "Screenshot clicked"
-                    } label: {
-                        actionButtonLabel("Screenshot", systemImage: "camera.viewfinder")
-                    }
-                    .frame(width: secondaryActionButtonWidth)
-                    .buttonStyle(.bordered)
-                    .controlSize(.regular)
-
-                    Button {
-                        status = "Mimic Type clicked"
-                    } label: {
-                        actionButtonLabel("Mimic Type", systemImage: "keyboard")
-                    }
-                    .frame(width: secondaryActionButtonWidth)
-                    .buttonStyle(.bordered)
-                    .controlSize(.regular)
-
-                    Spacer(minLength: 0)
-                }
+                ActionButtonRow(
+                    actions: secondaryActions,
+                    presentation: actionPresentation(for:),
+                    perform: perform
+                )
             }
             .padding(14)
         }
@@ -183,12 +129,36 @@ struct ContentView: View {
         }
     }
 
-    private func actionButtonLabel(_ title: String, systemImage: String) -> some View {
-        Label(title, systemImage: systemImage)
-            .font(.system(size: 12, weight: .regular))
-            .imageScale(.medium)
-            .lineLimit(1)
-            .frame(maxWidth: .infinity)
+    private func actionPresentation(for action: OverlayAction) -> ActionButtonPresentation {
+        action.presentation(
+            isRecording: isRecording,
+            primaryWidth: actionButtonWidth,
+            secondaryWidth: secondaryActionButtonWidth
+        )
+    }
+
+    private func perform(_ action: OverlayAction) {
+        switch action {
+        case .toggleTranscription:
+            toggleMockSpeakerTranscription()
+        case .requestAnswer:
+            requestMockAnswer()
+        case .copyTranscript:
+            copyTranscriptToPasteboard()
+        case .clearTranscript:
+            clearTranscript()
+        case .captureScreenshot:
+            status = "Screenshot clicked"
+        case .mimicType:
+            status = "Mimic Type clicked"
+        }
+    }
+
+    private func copyTranscriptToPasteboard() {
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(transcript, forType: .string)
+        status = "Copied"
     }
 
     private func startMockSpeakerTranscription() {
@@ -293,6 +263,43 @@ struct ContentView: View {
         status = "Ready"
     }
 
+}
+
+private struct ActionButtonRow: View {
+    let actions: [OverlayAction]
+    let presentation: (OverlayAction) -> ActionButtonPresentation
+    let perform: (OverlayAction) -> Void
+
+    var body: some View {
+        HStack(spacing: 8) {
+            ForEach(actions) { action in
+                let button = presentation(action)
+
+                Button {
+                    perform(action)
+                } label: {
+                    ActionButtonLabel(presentation: button)
+                }
+                .frame(width: button.width)
+                .buttonStyle(.bordered)
+                .controlSize(.regular)
+            }
+
+            Spacer(minLength: 0)
+        }
+    }
+}
+
+private struct ActionButtonLabel: View {
+    let presentation: ActionButtonPresentation
+
+    var body: some View {
+        Label(presentation.title, systemImage: presentation.systemImage)
+            .font(.system(size: 12, weight: .regular))
+            .imageScale(.medium)
+            .lineLimit(1)
+            .frame(maxWidth: .infinity)
+    }
 }
 
 private struct TranscriptTextView: NSViewRepresentable {
