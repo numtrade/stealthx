@@ -1,0 +1,9 @@
+.DS_Store
+DerivedData/
+
+# Xcode user-specific state
+*.xcuserstate
+*.xcscmblueprint
+xcuserdata/
+**/xcuserdata/
+**/project.xcworkspace/xcshareddata/
