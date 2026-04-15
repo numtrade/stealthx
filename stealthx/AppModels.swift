@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 // Backend integrations should only need to map behavior onto these typed actions
@@ -81,4 +82,34 @@ struct ActionButtonPresentation {
     let title: String
     let systemImage: String
     let width: CGFloat
+}
+
+struct MirrorExclusionApp: Identifiable {
+    let id: String
+    let name: String
+    let bundleIdentifier: String?
+    let icon: NSImage?
+    let isCurrentApp: Bool
+
+    init(runningApplication: NSRunningApplication) {
+        let bundleIdentifier = runningApplication.bundleIdentifier
+        let processIdentifier = runningApplication.processIdentifier
+
+        id = "\(bundleIdentifier ?? "pid"):\(processIdentifier)"
+        name = runningApplication.localizedName ?? bundleIdentifier ?? "Unknown App"
+        self.bundleIdentifier = bundleIdentifier
+        icon = runningApplication.icon
+        isCurrentApp = processIdentifier == ProcessInfo.processInfo.processIdentifier
+    }
+
+    static func runningUserFacingApps() -> [Self] {
+        NSWorkspace.shared.runningApplications
+            .filter { application in
+                application.activationPolicy == .regular && application.localizedName != nil
+            }
+            .map(MirrorExclusionApp.init(runningApplication:))
+            .sorted { lhs, rhs in
+                lhs.name.localizedStandardCompare(rhs.name) == .orderedAscending
+            }
+    }
 }

@@ -1,6 +1,11 @@
 import SwiftUI
 import AppKit
 
+private enum ContentMode {
+    case transcript
+    case mirrorSetup
+}
+
 struct ContentView: View {
     var showsWindowBounds = false
 
@@ -8,6 +13,9 @@ struct ContentView: View {
     @State private var isRecording = false
     @State private var status = "Ready"
     @State private var transcriptTask: Task<Void, Never>?
+    @State private var contentMode: ContentMode = .transcript
+    @State private var mirrorExclusionApps: [MirrorExclusionApp] = []
+    @State private var excludedMirrorAppIDs: Set<String> = []
 
     private let transcriptPlaceholder =
         "Speaker transcript appears here after Start begins speaker-output capture."
@@ -32,19 +40,23 @@ struct ContentView: View {
             VStack(spacing: 12) {
                 headerView
 
-                transcriptPanel
+                if isShowingMirrorSetup {
+                    mirrorSetupView
+                } else {
+                    transcriptPanel
 
-                ActionButtonRow(
-                    actions: primaryActions,
-                    presentation: actionPresentation(for:),
-                    perform: perform
-                )
+                    ActionButtonRow(
+                        actions: primaryActions,
+                        presentation: actionPresentation(for:),
+                        perform: perform
+                    )
 
-                ActionButtonRow(
-                    actions: secondaryActions,
-                    presentation: actionPresentation(for:),
-                    perform: perform
-                )
+                    ActionButtonRow(
+                        actions: secondaryActions,
+                        presentation: actionPresentation(for:),
+                        perform: perform
+                    )
+                }
             }
             .padding(14)
         }
@@ -80,6 +92,16 @@ struct ContentView: View {
     }
 
     private var headerView: some View {
+        Group {
+            if isShowingMirrorSetup {
+                mirrorSetupHeaderView
+            } else {
+                transcriptHeaderView
+            }
+        }
+    }
+
+    private var transcriptHeaderView: some View {
         HStack(spacing: 8) {
             Circle()
                 .fill(indicatorColor)
@@ -106,6 +128,30 @@ struct ContentView: View {
         }
     }
 
+    private var mirrorSetupHeaderView: some View {
+        HStack(spacing: 8) {
+            Button {
+                dismissMirrorWindowSetup()
+            } label: {
+                Label("Back", systemImage: "chevron.left")
+                    .font(.system(size: 12, weight: .regular))
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+
+            Text("Mirror Window")
+                .font(.headline)
+                .foregroundStyle(primaryTextColor)
+
+            Spacer()
+
+            Text("Exclude Apps")
+                .font(.caption)
+                .foregroundStyle(secondaryTextColor)
+                .lineLimit(1)
+        }
+    }
+
     private var transcriptPanel: some View {
         ZStack(alignment: .topLeading) {
             TranscriptTextView(text: transcript)
@@ -120,6 +166,88 @@ struct ContentView: View {
                     .allowsHitTesting(false)
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(transcriptBackgroundColor)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(panelStroke, lineWidth: 1)
+        )
+    }
+
+    private var isShowingMirrorSetup: Bool {
+        contentMode == .mirrorSetup
+    }
+
+    private var mirrorSetupView: some View {
+        VStack(spacing: 12) {
+            mirrorSetupPanel
+
+            HStack(spacing: 8) {
+                Button("Refresh Apps") {
+                    refreshMirrorExclusionApps()
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+
+                Spacer()
+
+                Text(mirrorSelectionSummary)
+                    .font(.caption)
+                    .foregroundStyle(secondaryTextColor)
+                    .lineLimit(1)
+
+                Button("Create Mirror") {
+                    createMirrorWindow()
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.small)
+            }
+        }
+    }
+
+    private var mirrorSetupPanel: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Choose which running apps should stay out of the mirrored screen.")
+                .font(.system(size: 13, weight: .regular))
+                .foregroundStyle(primaryTextColor)
+
+            Text("This is a GUI-only handoff for backend wiring. The selection stays inside the app for now.")
+                .font(.caption)
+                .foregroundStyle(secondaryTextColor)
+
+            Group {
+                if mirrorExclusionApps.isEmpty {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("No running apps found.")
+                            .font(.system(size: 13, weight: .regular))
+                            .foregroundStyle(primaryTextColor)
+
+                        Text("Refresh the list once the apps you want to exclude are open.")
+                            .font(.caption)
+                            .foregroundStyle(secondaryTextColor)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                } else {
+                    ScrollView {
+                        VStack(spacing: 6) {
+                            ForEach(mirrorExclusionApps) { app in
+                                MirrorExclusionAppRow(
+                                    app: app,
+                                    isSelected: excludedMirrorAppIDs.contains(app.id),
+                                    toggle: { toggleMirrorExclusion(for: app) }
+                                )
+                            }
+                        }
+                        .padding(.vertical, 2)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                }
+            }
+        }
+        .padding(10)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
@@ -292,11 +420,63 @@ struct ContentView: View {
     }
 
     private func beginMirrorWindowSetup() {
-        // Future hook: open the mirror-window flow and let the backend provide
-        // exclusion controls for anything that should stay out of the mirrored view.
-        status = "Mirror Setup Pending"
+        refreshMirrorExclusionApps()
+        contentMode = .mirrorSetup
+        status = "Select Exclusions"
     }
 
+    private func dismissMirrorWindowSetup() {
+        contentMode = .transcript
+        status = mirrorSelectionStatus
+    }
+
+    private func refreshMirrorExclusionApps() {
+        let apps = MirrorExclusionApp.runningUserFacingApps()
+        let availableIDs = Set(apps.map(\.id))
+        let preservedSelections = excludedMirrorAppIDs.intersection(availableIDs)
+
+        mirrorExclusionApps = apps
+
+        if preservedSelections.isEmpty {
+            excludedMirrorAppIDs = Set(apps.filter(\.isCurrentApp).map(\.id))
+        } else {
+            excludedMirrorAppIDs = preservedSelections
+        }
+    }
+
+    private func toggleMirrorExclusion(for app: MirrorExclusionApp) {
+        if excludedMirrorAppIDs.contains(app.id) {
+            excludedMirrorAppIDs.remove(app.id)
+        } else {
+            excludedMirrorAppIDs.insert(app.id)
+        }
+    }
+
+    private var mirrorSelectionSummary: String {
+        let count = excludedMirrorAppIDs.count
+        if count == 1 {
+            return "1 app selected"
+        } else {
+            return "\(count) apps selected"
+        }
+    }
+
+    private var mirrorSelectionStatus: String {
+        let count = excludedMirrorAppIDs.count
+        if count == 0 {
+            return "Mirror Ready"
+        } else if count == 1 {
+            return "1 App Excluded"
+        } else {
+            return "\(count) Apps Excluded"
+        }
+    }
+
+    private func createMirrorWindow() {
+        // Future hook: backend will use the selected app ids to launch the
+        // real mirrored-screen flow and exclude these apps from capture.
+        status = "Mirror Create Pending"
+    }
 }
 
 private struct ActionButton: View {
@@ -344,6 +524,100 @@ private struct ActionButtonLabel: View {
             .imageScale(.medium)
             .lineLimit(1)
             .frame(maxWidth: .infinity)
+    }
+}
+
+private struct MirrorExclusionAppRow: View {
+    let app: MirrorExclusionApp
+    let isSelected: Bool
+    let toggle: () -> Void
+
+    var body: some View {
+        Button {
+            toggle()
+        } label: {
+            HStack(spacing: 10) {
+                MirrorExclusionAppIcon(icon: app.icon)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 6) {
+                        Text(app.name)
+                            .font(.system(size: 13, weight: .regular))
+                            .foregroundStyle(Color(nsColor: .labelColor))
+                            .lineLimit(1)
+
+                        if app.isCurrentApp {
+                            Text("This App")
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundStyle(Color(nsColor: .secondaryLabelColor))
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(
+                                    Capsule(style: .continuous)
+                                        .fill(Color(nsColor: .controlBackgroundColor))
+                                )
+                        }
+                    }
+
+                    if let bundleIdentifier = app.bundleIdentifier {
+                        Text(bundleIdentifier)
+                            .font(.caption)
+                            .foregroundStyle(Color(nsColor: .secondaryLabelColor))
+                            .lineLimit(1)
+                    }
+                }
+
+                Spacer(minLength: 0)
+
+                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(
+                        isSelected
+                            ? Color(nsColor: .controlAccentColor)
+                            : Color(nsColor: .tertiaryLabelColor)
+                    )
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .background(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(
+                        isSelected
+                            ? Color(nsColor: .controlAccentColor).opacity(0.08)
+                            : Color.clear
+                    )
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke(
+                        Color(nsColor: .separatorColor).opacity(isSelected ? 0.3 : 0.12),
+                        lineWidth: 1
+                    )
+            )
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+private struct MirrorExclusionAppIcon: View {
+    let icon: NSImage?
+
+    var body: some View {
+        Group {
+            if let icon {
+                Image(nsImage: icon)
+                    .resizable()
+                    .interpolation(.high)
+            } else {
+                Image(systemName: "app.fill")
+                    .resizable()
+                    .scaledToFit()
+                    .foregroundStyle(Color(nsColor: .secondaryLabelColor))
+                    .padding(4)
+            }
+        }
+        .frame(width: 22, height: 22)
+        .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
     }
 }
 
