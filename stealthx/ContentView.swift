@@ -13,6 +13,7 @@ struct ContentView: View {
         "Speaker transcript appears here after Start begins speaker-output capture."
     private let actionButtonWidth: CGFloat = 92
     private let secondaryActionButtonWidth: CGFloat = 126
+    private let headerActionButtonWidth: CGFloat = 142
     private let primaryActions = OverlayAction.primaryRow
     private let secondaryActions = OverlayAction.secondaryRow
     // Mock speaker-side transcript until backend wires live system-audio transcription.
@@ -95,11 +96,13 @@ struct ContentView: View {
                 perform: { perform(.mirrorWindow) },
                 controlSize: .small
             )
+            .layoutPriority(1)
 
             Text(status)
                 .font(.caption)
                 .foregroundStyle(secondaryTextColor)
                 .lineLimit(1)
+                .truncationMode(.tail)
         }
     }
 
@@ -148,7 +151,7 @@ struct ContentView: View {
         action.presentation(
             isRecording: isRecording,
             primaryWidth: actionButtonWidth,
-            secondaryWidth: 120
+            secondaryWidth: headerActionButtonWidth
         )
     }
 
