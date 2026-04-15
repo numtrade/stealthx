@@ -412,7 +412,24 @@ struct ContentView: View {
     }
 
     private func captureScreenshot() {
-        status = "Screenshot clicked"
+        status = "Saving Screenshot"
+
+        Task {
+            do {
+                try await Task.detached(priority: .userInitiated) {
+                    try ScreenshotCaptureService.capture()
+                }.value
+
+                try await MainActor.run {
+                    try ScreenshotCaptureService.copyToClipboard()
+                    status = "Screenshot Copied"
+                }
+            } catch {
+                await MainActor.run {
+                    status = "Screenshot Failed"
+                }
+            }
+        }
     }
 
     private func triggerMimicType() {

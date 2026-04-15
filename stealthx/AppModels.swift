@@ -161,3 +161,77 @@ struct MirrorExclusionApp: Identifiable {
             }
     }
 }
+
+enum ScreenshotCaptureService {
+    private static let executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
+    private static let outputDirectory = FileManager.default.homeDirectoryForCurrentUser
+        .appendingPathComponent(".stealthx", isDirectory: true)
+        .appendingPathComponent("tmp", isDirectory: true)
+        .appendingPathComponent("screenshot", isDirectory: true)
+    static let outputFileURL = outputDirectory.appendingPathComponent("screenshot.png")
+
+    static func capture() throws {
+        let fileManager = FileManager.default
+        try fileManager.createDirectory(
+            at: outputDirectory,
+            withIntermediateDirectories: true
+        )
+
+        let errorPipe = Pipe()
+        let process = Process()
+        process.executableURL = executableURL
+        process.arguments = ["-x", outputFileURL.path]
+        process.standardError = errorPipe
+
+        try process.run()
+        process.waitUntilExit()
+
+        let errorData = errorPipe.fileHandleForReading.readDataToEndOfFile()
+        let errorOutput = String(data: errorData, encoding: .utf8)?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+
+        guard process.terminationStatus == 0 else {
+            throw NSError(
+                domain: "ScreenshotCaptureService",
+                code: Int(process.terminationStatus),
+                userInfo: [NSLocalizedDescriptionKey: errorOutput]
+            )
+        }
+
+        guard fileManager.fileExists(atPath: outputFileURL.path) else {
+            throw NSError(
+                domain: "ScreenshotCaptureService",
+                code: 1,
+                userInfo: [
+                    NSLocalizedDescriptionKey:
+                        "screencapture finished but did not create \(outputFileURL.path)"
+                ]
+            )
+        }
+    }
+
+    @MainActor
+    static func copyToClipboard() throws {
+        guard let image = NSImage(contentsOf: outputFileURL) else {
+            throw NSError(
+                domain: "ScreenshotCaptureService",
+                code: 2,
+                userInfo: [
+                    NSLocalizedDescriptionKey:
+                        "Could not read screenshot at \(outputFileURL.path)"
+                ]
+            )
+        }
+
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+
+        guard pasteboard.writeObjects([image]) else {
+            throw NSError(
+                domain: "ScreenshotCaptureService",
+                code: 3,
+                userInfo: [NSLocalizedDescriptionKey: "Could not copy screenshot to clipboard"]
+            )
+        }
+    }
+}
