@@ -1,0 +1,19 @@
+.DS_Store
+DerivedData/
+build/
+.build/
+*.app
+*.dSYM
+*.dSYM.zip
+*.xcarchive
+*.xcresult
+
+# Xcode user-specific state
+*.xcuserstate
+*.xcscmblueprint
+xcuserdata/
+**/xcuserdata/
+**/project.xcworkspace/xcshareddata/
+
+# Ignore accidental nested project copies from folder moves.
+stealthx/stealthx.xcodeproj/
