@@ -90,26 +90,74 @@ struct MirrorExclusionApp: Identifiable {
     let bundleIdentifier: String?
     let icon: NSImage?
     let isCurrentApp: Bool
+    let isAlwaysExcluded: Bool
+
+    private init(
+        id: String,
+        name: String,
+        bundleIdentifier: String?,
+        icon: NSImage?,
+        isCurrentApp: Bool,
+        isAlwaysExcluded: Bool
+    ) {
+        self.id = id
+        self.name = name
+        self.bundleIdentifier = bundleIdentifier
+        self.icon = icon
+        self.isCurrentApp = isCurrentApp
+        self.isAlwaysExcluded = isAlwaysExcluded
+    }
 
     init(runningApplication: NSRunningApplication) {
         let bundleIdentifier = runningApplication.bundleIdentifier
         let processIdentifier = runningApplication.processIdentifier
 
-        id = "\(bundleIdentifier ?? "pid"):\(processIdentifier)"
-        name = runningApplication.localizedName ?? bundleIdentifier ?? "Unknown App"
-        self.bundleIdentifier = bundleIdentifier
-        icon = runningApplication.icon
-        isCurrentApp = processIdentifier == ProcessInfo.processInfo.processIdentifier
+        self.init(
+            id: "\(bundleIdentifier ?? "pid"):\(processIdentifier)",
+            name: runningApplication.localizedName ?? bundleIdentifier ?? "Unknown App",
+            bundleIdentifier: bundleIdentifier,
+            icon: runningApplication.icon,
+            isCurrentApp: processIdentifier == ProcessInfo.processInfo.processIdentifier,
+            isAlwaysExcluded: false
+        )
     }
 
-    static func runningUserFacingApps() -> [Self] {
-        NSWorkspace.shared.runningApplications
+    static func currentOverlayApp() -> Self {
+        let bundleIdentifier = Bundle.main.bundleIdentifier
+        let processIdentifier = ProcessInfo.processInfo.processIdentifier
+        let displayName =
+            (Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String)
+            ?? (Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as? String)
+            ?? ProcessInfo.processInfo.processName
+        let appIcon = NSWorkspace.shared.icon(forFile: Bundle.main.bundlePath)
+
+        return Self(
+            id: "\(bundleIdentifier ?? "current-app"):\(processIdentifier)",
+            name: displayName,
+            bundleIdentifier: bundleIdentifier,
+            icon: appIcon,
+            isCurrentApp: true,
+            isAlwaysExcluded: true
+        )
+    }
+
+    static func availableExclusions() -> [Self] {
+        let currentApp = currentOverlayApp()
+
+        return NSWorkspace.shared.runningApplications
             .filter { application in
-                application.activationPolicy == .regular && application.localizedName != nil
+                application.activationPolicy == .regular
+                    && application.localizedName != nil
+                    && application.processIdentifier != ProcessInfo.processInfo.processIdentifier
             }
             .map(MirrorExclusionApp.init(runningApplication:))
             .sorted { lhs, rhs in
                 lhs.name.localizedStandardCompare(rhs.name) == .orderedAscending
+            }
+            .reduce(into: [currentApp]) { result, app in
+                if app.id != currentApp.id {
+                    result.append(app)
+                }
             }
     }
 }

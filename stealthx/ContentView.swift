@@ -214,7 +214,7 @@ struct ContentView: View {
                 .font(.system(size: 13, weight: .regular))
                 .foregroundStyle(primaryTextColor)
 
-            Text("This is a GUI-only handoff for backend wiring. The selection stays inside the app for now.")
+            Text("This is a GUI-only handoff for backend wiring. The selection stays inside the app for now, and this overlay app remains excluded by default.")
                 .font(.caption)
                 .foregroundStyle(secondaryTextColor)
 
@@ -431,20 +431,19 @@ struct ContentView: View {
     }
 
     private func refreshMirrorExclusionApps() {
-        let apps = MirrorExclusionApp.runningUserFacingApps()
+        let apps = MirrorExclusionApp.availableExclusions()
         let availableIDs = Set(apps.map(\.id))
         let preservedSelections = excludedMirrorAppIDs.intersection(availableIDs)
+        let alwaysExcludedIDs = Set(apps.filter(\.isAlwaysExcluded).map(\.id))
 
         mirrorExclusionApps = apps
 
-        if preservedSelections.isEmpty {
-            excludedMirrorAppIDs = Set(apps.filter(\.isCurrentApp).map(\.id))
-        } else {
-            excludedMirrorAppIDs = preservedSelections
-        }
+        excludedMirrorAppIDs = preservedSelections.union(alwaysExcludedIDs)
     }
 
     private func toggleMirrorExclusion(for app: MirrorExclusionApp) {
+        guard !app.isAlwaysExcluded else { return }
+
         if excludedMirrorAppIDs.contains(app.id) {
             excludedMirrorAppIDs.remove(app.id)
         } else {
@@ -533,69 +532,87 @@ private struct MirrorExclusionAppRow: View {
     let toggle: () -> Void
 
     var body: some View {
-        Button {
-            toggle()
-        } label: {
-            HStack(spacing: 10) {
-                MirrorExclusionAppIcon(icon: app.icon)
+        Group {
+            if app.isAlwaysExcluded {
+                rowContent
+            } else {
+                Button {
+                    toggle()
+                } label: {
+                    rowContent
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
 
-                VStack(alignment: .leading, spacing: 2) {
-                    HStack(spacing: 6) {
-                        Text(app.name)
-                            .font(.system(size: 13, weight: .regular))
-                            .foregroundStyle(Color(nsColor: .labelColor))
-                            .lineLimit(1)
+    private var rowContent: some View {
+        HStack(spacing: 10) {
+            MirrorExclusionAppIcon(icon: app.icon)
 
-                        if app.isCurrentApp {
-                            Text("This App")
-                                .font(.system(size: 10, weight: .medium))
-                                .foregroundStyle(Color(nsColor: .secondaryLabelColor))
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 2)
-                                .background(
-                                    Capsule(style: .continuous)
-                                        .fill(Color(nsColor: .controlBackgroundColor))
-                                )
-                        }
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 6) {
+                    Text(app.name)
+                        .font(.system(size: 13, weight: .regular))
+                        .foregroundStyle(Color(nsColor: .labelColor))
+                        .lineLimit(1)
+
+                    if app.isCurrentApp {
+                        badge("This App")
                     }
 
-                    if let bundleIdentifier = app.bundleIdentifier {
-                        Text(bundleIdentifier)
-                            .font(.caption)
-                            .foregroundStyle(Color(nsColor: .secondaryLabelColor))
-                            .lineLimit(1)
+                    if app.isAlwaysExcluded {
+                        badge("Always Excluded")
                     }
                 }
 
-                Spacer(minLength: 0)
-
-                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                    .font(.system(size: 15, weight: .medium))
-                    .foregroundStyle(
-                        isSelected
-                            ? Color(nsColor: .controlAccentColor)
-                            : Color(nsColor: .tertiaryLabelColor)
-                    )
+                if let bundleIdentifier = app.bundleIdentifier {
+                    Text(bundleIdentifier)
+                        .font(.caption)
+                        .foregroundStyle(Color(nsColor: .secondaryLabelColor))
+                        .lineLimit(1)
+                }
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 8)
-            .background(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(
-                        isSelected
-                            ? Color(nsColor: .controlAccentColor).opacity(0.08)
-                            : Color.clear
-                    )
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .stroke(
-                        Color(nsColor: .separatorColor).opacity(isSelected ? 0.3 : 0.12),
-                        lineWidth: 1
-                    )
-            )
+
+            Spacer(minLength: 0)
+
+            Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                .font(.system(size: 15, weight: .medium))
+                .foregroundStyle(
+                    isSelected
+                        ? Color(nsColor: .controlAccentColor)
+                        : Color(nsColor: .tertiaryLabelColor)
+                )
         }
-        .buttonStyle(.plain)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(
+                    isSelected
+                        ? Color(nsColor: .controlAccentColor).opacity(0.08)
+                        : Color.clear
+                )
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(
+                    Color(nsColor: .separatorColor).opacity(isSelected ? 0.3 : 0.12),
+                    lineWidth: 1
+                )
+        )
+    }
+
+    private func badge(_ title: String) -> some View {
+        Text(title)
+            .font(.system(size: 10, weight: .medium))
+            .foregroundStyle(Color(nsColor: .secondaryLabelColor))
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+            .background(
+                Capsule(style: .continuous)
+                    .fill(Color(nsColor: .controlBackgroundColor))
+            )
     }
 }
 
