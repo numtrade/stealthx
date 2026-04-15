@@ -1,171 +1,65 @@
 import SwiftUI
 import AppKit
 
+private enum ContentMode {
+    case transcript
+    case mirrorSetup
+}
+
 struct ContentView: View {
     var showsWindowBounds = false
 
     @State private var transcript = ""
     @State private var isRecording = false
     @State private var status = "Ready"
-    @FocusState private var editorFocused: Bool
+    @State private var transcriptTask: Task<Void, Never>?
+    @State private var contentMode: ContentMode = .transcript
+    @State private var mirrorExclusionApps: [MirrorExclusionApp] = []
+    @State private var excludedMirrorAppIDs: Set<String> = []
 
-    private let graphiteText = Color(red: 0.18, green: 0.18, blue: 0.15)
-    private let macAccentColor = Color(red: 0.82, green: 0.29, blue: 0.22)
-    private let unixAccentColor = Color(red: 0.13, green: 0.45, blue: 0.61)
-    private let windowBackgroundColor = Color(red: 0.72, green: 0.72, blue: 0.68)
+    private let transcriptPlaceholder =
+        "Speaker transcript appears here after Start begins speaker-output capture."
+    private let actionButtonWidth: CGFloat = 92
+    private let secondaryActionButtonWidth: CGFloat = 126
+    private let headerActionButtonWidth: CGFloat = 142
+    private let primaryActions = OverlayAction.primaryRow
+    private let secondaryActions = OverlayAction.secondaryRow
+    // Mock speaker-side transcript until backend wires live system-audio transcription.
+    private let mockSpeakerTranscriptParagraphs = [
+        "Starting speaker-output transcription demo so the backend team can see the intended flow clearly.",
+        "This transcript is still hard-coded for the handoff, but it now appears word by word like live text coming from the speaker output.",
+        "Replace this mocked stream with real speaker-output transcription events once the backend is ready.",
+        "Auto-follow should remain smooth as the transcript grows, and it should stop pulling the view when someone scrolls up to review older words.",
+    ]
 
     var body: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(panelFill)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .stroke(panelBorderColor, lineWidth: 1)
-                )
-                .overlay(alignment: .top) {
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .stroke(Color.white.opacity(0.48), lineWidth: 1)
-                        .padding(1)
-                        .mask(
-                            LinearGradient(
-                                colors: [Color.white, Color.white.opacity(0)],
-                                startPoint: .top,
-                                endPoint: .bottom
-                            )
-                        )
-                }
-                .shadow(color: .black.opacity(0.18), radius: 10, x: 0, y: 6)
+            Color(nsColor: .windowBackgroundColor)
+                .ignoresSafeArea()
 
-            VStack(spacing: 14) {
-                HStack(spacing: 10) {
-                    ZStack {
-                        Circle()
-                            .fill(
-                                LinearGradient(
-                                    colors: [
-                                        Color.white.opacity(0.58),
-                                        Color.black.opacity(0.08),
-                                    ],
-                                    startPoint: .top,
-                                    endPoint: .bottom
-                                )
-                            )
+            VStack(spacing: 12) {
+                headerView
 
-                        Circle()
-                            .fill(recordIndicatorFill)
-                            .padding(2.5)
-                    }
-                    .frame(width: 14, height: 14)
-                    .overlay(
-                        Circle()
-                            .stroke(Color.black.opacity(0.35), lineWidth: 1)
+                if isShowingMirrorSetup {
+                    mirrorSetupView
+                } else {
+                    transcriptPanel
+
+                    ActionButtonRow(
+                        actions: primaryActions,
+                        presentation: actionPresentation(for:),
+                        perform: perform
                     )
-                    .shadow(color: .white.opacity(0.28), radius: 0, x: 0, y: 1)
 
-                    brandView
-
-                    Spacer()
-
-                    Text(status)
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(statusTextColor)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 4)
-                        .background(
-                            RoundedRectangle(cornerRadius: 7, style: .continuous)
-                                .fill(statusFill)
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 7, style: .continuous)
-                                .stroke(Color.black.opacity(0.22), lineWidth: 1)
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                .stroke(Color.white.opacity(0.42), lineWidth: 1)
-                                .padding(1)
-                        )
-                }
-
-                TextEditor(text: $transcript)
-                    .focused($editorFocused)
-                    .font(.system(size: 14))
-                    .foregroundColor(Color(red: 0.15, green: 0.14, blue: 0.12))
-                    .scrollContentBackground(.hidden)
-                    .padding(10)
-                    .background(
-                        RoundedRectangle(cornerRadius: 11, style: .continuous)
-                            .fill(editorFill)
+                    ActionButtonRow(
+                        actions: secondaryActions,
+                        presentation: actionPresentation(for:),
+                        perform: perform
                     )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 11, style: .continuous)
-                            .stroke(editorBorderColor, lineWidth: 1)
-                    )
-                    .overlay(alignment: .top) {
-                        RoundedRectangle(cornerRadius: 0, style: .continuous)
-                            .stroke(Color.white.opacity(0.44), lineWidth: 1)
-                            .padding(1)
-                            .mask(
-                                LinearGradient(
-                                    colors: [Color.white, Color.white.opacity(0)],
-                                    startPoint: .top,
-                                    endPoint: .bottom
-                                )
-                            )
-                    }
-
-                HStack(spacing: 8) {
-                    Button {
-                        isRecording = true
-                        status = "Recording"
-                    } label: {
-                        Label("Start", systemImage: "mic.fill")
-                    }
-                    .buttonStyle(StealthButtonStyle(kind: .primary, active: isRecording))
-
-                    Button {
-                        isRecording = false
-                        status = "Stopped"
-                    } label: {
-                        Label("Stop", systemImage: "stop.fill")
-                    }
-                    .buttonStyle(StealthButtonStyle(kind: .danger))
-
-                    Button {
-                        let pasteboard = NSPasteboard.general
-                        pasteboard.clearContents()
-                        pasteboard.setString(transcript, forType: .string)
-                        status = "Copied"
-                    } label: {
-                        Label("Copy", systemImage: "doc.on.doc")
-                    }
-                    .buttonStyle(StealthButtonStyle())
-
-                    Spacer()
-                }
-
-                HStack(spacing: 8) {
-                    Button {
-                        status = "Screenshot clicked"
-                    } label: {
-                        Label("Screenshot", systemImage: "camera.viewfinder")
-                    }
-                    .buttonStyle(StealthButtonStyle())
-
-                    Button {
-                        editorFocused = true
-                        status = "Typing"
-                    } label: {
-                        Label("Type", systemImage: "keyboard")
-                    }
-                    .buttonStyle(StealthButtonStyle())
-
-                    Spacer()
                 }
             }
-            .padding(16)
+            .padding(14)
         }
-        .padding(8)
-        .background(windowBackgroundColor)
         .overlay {
             if showsWindowBounds {
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
@@ -177,252 +71,743 @@ struct ContentView: View {
         }
     }
 
-    private var panelFill: LinearGradient {
-        LinearGradient(
-            colors: [
-                Color(red: 0.89, green: 0.89, blue: 0.85),
-                Color(red: 0.78, green: 0.78, blue: 0.74),
-                Color(red: 0.66, green: 0.66, blue: 0.62),
-            ],
-            startPoint: .top,
-            endPoint: .bottom
-        )
+    private var primaryTextColor: Color {
+        Color(nsColor: .labelColor)
     }
 
-    private var panelBorderColor: Color {
-        Color(red: 0.38, green: 0.38, blue: 0.34)
+    private var secondaryTextColor: Color {
+        Color(nsColor: .secondaryLabelColor)
     }
 
-    private var editorFill: LinearGradient {
-        LinearGradient(
-            colors: [
-                Color(red: 0.93, green: 0.92, blue: 0.88),
-                Color(red: 0.86, green: 0.85, blue: 0.80),
-            ],
-            startPoint: .top,
-            endPoint: .bottom
-        )
+    private var panelStroke: Color {
+        primaryTextColor.opacity(0.08)
     }
 
-    private var editorBorderColor: Color {
-        Color(red: 0.47, green: 0.46, blue: 0.42)
+    private var transcriptBackgroundColor: Color {
+        Color(nsColor: .textBackgroundColor).opacity(0.9)
     }
 
-    private var recordIndicatorFill: LinearGradient {
-        if isRecording {
-            return LinearGradient(
-                colors: [
-                    Color(red: 0.95, green: 0.40, blue: 0.38),
-                    Color(red: 0.58, green: 0.12, blue: 0.10),
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-        } else {
-            return LinearGradient(
-                colors: [
-                    Color(red: 0.80, green: 0.80, blue: 0.77),
-                    Color(red: 0.53, green: 0.53, blue: 0.49),
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-        }
+    private var indicatorColor: Color {
+        isRecording ? Color(nsColor: .systemRed) : Color.gray.opacity(0.5)
     }
 
-    private var statusFill: LinearGradient {
-        if isRecording {
-            return LinearGradient(
-                colors: [
-                    Color(red: 0.97, green: 0.79, blue: 0.78),
-                    Color(red: 0.75, green: 0.48, blue: 0.46),
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-        } else {
-            return LinearGradient(
-                colors: [
-                    Color(red: 0.93, green: 0.92, blue: 0.88),
-                    Color(red: 0.77, green: 0.76, blue: 0.71),
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-        }
-    }
-
-    private var statusTextColor: Color {
-        if isRecording {
-            return Color(red: 0.35, green: 0.08, blue: 0.08)
-        } else {
-            return Color(red: 0.29, green: 0.28, blue: 0.25)
-        }
-    }
-
-    private var brandView: some View {
-        HStack(spacing: 8) {
-
-            HStack(spacing: 0) {
-                Text("Mac")
-                    .foregroundStyle(macAccentColor)
-                Text("Unix")
-                    .foregroundStyle(unixAccentColor)
+    private var headerView: some View {
+        Group {
+            if isShowingMirrorSetup {
+                mirrorSetupHeaderView
+            } else {
+                transcriptHeaderView
             }
-            .font(.system(size: 18, weight: .semibold))
-            .tracking(0.2)
         }
     }
 
-    private func brandPill(_ color: Color) -> some View {
-        RoundedRectangle(cornerRadius: 1.5, style: .continuous)
-            .fill(color)
-            .frame(width: 4, height: 11)
-            .overlay(
-                RoundedRectangle(cornerRadius: 1.5, style: .continuous)
-                    .stroke(Color.black.opacity(0.12), lineWidth: 0.5)
+    private var transcriptHeaderView: some View {
+        HStack(spacing: 8) {
+            Circle()
+                .fill(indicatorColor)
+                .frame(width: 8, height: 8)
+
+            Text("MacUnix")
+                .font(.headline)
+                .foregroundStyle(primaryTextColor)
+
+            Spacer()
+
+            ActionButton(
+                presentation: headerActionPresentation(for: .mirrorWindow),
+                perform: { perform(.mirrorWindow) },
+                controlSize: .small
             )
+            .layoutPriority(1)
+
+            Text(status)
+                .font(.caption)
+                .foregroundStyle(secondaryTextColor)
+                .lineLimit(1)
+                .truncationMode(.tail)
+        }
+    }
+
+    private var mirrorSetupHeaderView: some View {
+        HStack(spacing: 8) {
+            Button {
+                dismissMirrorWindowSetup()
+            } label: {
+                Label("Back", systemImage: "chevron.left")
+                    .font(.system(size: 12, weight: .regular))
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+
+            Text("Mirror Window")
+                .font(.headline)
+                .foregroundStyle(primaryTextColor)
+
+            Spacer()
+
+            Text("Exclude Apps")
+                .font(.caption)
+                .foregroundStyle(secondaryTextColor)
+                .lineLimit(1)
+        }
+    }
+
+    private var transcriptPanel: some View {
+        ZStack(alignment: .topLeading) {
+            TranscriptTextView(text: transcript)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+
+            if transcript.isEmpty {
+                Text(transcriptPlaceholder)
+                    .font(.system(size: 14, weight: .regular))
+                    .foregroundStyle(transcriptTextColor)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 10)
+                    .allowsHitTesting(false)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(transcriptBackgroundColor)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(panelStroke, lineWidth: 1)
+        )
+    }
+
+    private var isShowingMirrorSetup: Bool {
+        contentMode == .mirrorSetup
+    }
+
+    private var mirrorSetupView: some View {
+        VStack(spacing: 12) {
+            mirrorSetupPanel
+
+            HStack(spacing: 8) {
+                Button("Refresh Apps") {
+                    refreshMirrorExclusionApps()
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+
+                Spacer()
+
+                Text(mirrorSelectionSummary)
+                    .font(.caption)
+                    .foregroundStyle(secondaryTextColor)
+                    .lineLimit(1)
+
+                Button("Create Mirror") {
+                    createMirrorWindow()
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.small)
+            }
+        }
+    }
+
+    private var mirrorSetupPanel: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Choose which running apps should stay out of the mirrored screen.")
+                .font(.system(size: 13, weight: .regular))
+                .foregroundStyle(primaryTextColor)
+
+            Text("This is a GUI-only handoff for backend wiring. The selection stays inside the app for now, and this overlay app remains excluded by default.")
+                .font(.caption)
+                .foregroundStyle(secondaryTextColor)
+
+            Group {
+                if mirrorExclusionApps.isEmpty {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("No running apps found.")
+                            .font(.system(size: 13, weight: .regular))
+                            .foregroundStyle(primaryTextColor)
+
+                        Text("Refresh the list once the apps you want to exclude are open.")
+                            .font(.caption)
+                            .foregroundStyle(secondaryTextColor)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                } else {
+                    ScrollView {
+                        VStack(spacing: 6) {
+                            ForEach(mirrorExclusionApps) { app in
+                                MirrorExclusionAppRow(
+                                    app: app,
+                                    isSelected: excludedMirrorAppIDs.contains(app.id),
+                                    toggle: { toggleMirrorExclusion(for: app) }
+                                )
+                            }
+                        }
+                        .padding(.vertical, 2)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                }
+            }
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(transcriptBackgroundColor)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(panelStroke, lineWidth: 1)
+        )
+    }
+
+    private var transcriptTextColor: Color {
+        if transcript.isEmpty {
+            return secondaryTextColor
+        } else {
+            return primaryTextColor
+        }
+    }
+
+    private func actionPresentation(for action: OverlayAction) -> ActionButtonPresentation {
+        action.presentation(
+            isRecording: isRecording,
+            primaryWidth: actionButtonWidth,
+            secondaryWidth: secondaryActionButtonWidth
+        )
+    }
+
+    private func headerActionPresentation(for action: OverlayAction) -> ActionButtonPresentation {
+        action.presentation(
+            isRecording: isRecording,
+            primaryWidth: actionButtonWidth,
+            secondaryWidth: headerActionButtonWidth
+        )
+    }
+
+    private func perform(_ action: OverlayAction) {
+        switch action {
+        case .toggleTranscription:
+            toggleMockSpeakerTranscription()
+        case .requestAnswer:
+            requestMockAnswer()
+        case .copyTranscript:
+            copyTranscriptToPasteboard()
+        case .clearTranscript:
+            clearTranscript()
+        case .captureScreenshot:
+            captureScreenshot()
+        case .mimicType:
+            triggerMimicType()
+        case .mirrorWindow:
+            beginMirrorWindowSetup()
+        }
+    }
+
+    private func copyTranscriptToPasteboard() {
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(transcript, forType: .string)
+        status = "Copied"
+    }
+
+    private func startMockSpeakerTranscription() {
+        transcriptTask?.cancel()
+        transcriptTask = nil
+        isRecording = true
+        status = "Transcribing"
+
+        guard !mockSpeakerTranscriptParagraphs.isEmpty else {
+            transcript = ""
+            return
+        }
+
+        let tokens = mockSpeakerTranscriptParagraphs.enumerated().flatMap { index, paragraph in
+            let words = paragraph.split(separator: " ").map(String.init)
+            if index < mockSpeakerTranscriptParagraphs.count - 1 {
+                return words + ["\n"]
+            } else {
+                return words
+            }
+        }
+
+        guard let firstToken = tokens.first else {
+            transcript = ""
+            return
+        }
+
+        transcript = firstToken
+
+        transcriptTask = Task {
+            for token in tokens.dropFirst() {
+                try? await Task.sleep(nanoseconds: mockTranscriptDelay(for: token))
+                guard !Task.isCancelled else { return }
+
+                await MainActor.run {
+                    if token == "\n" {
+                        transcript += "\n"
+                    } else if transcript.isEmpty || transcript.hasSuffix("\n") {
+                        transcript += token
+                    } else {
+                        transcript += " " + token
+                    }
+                }
+            }
+
+            guard !Task.isCancelled else { return }
+
+            await MainActor.run {
+                isRecording = false
+                status = "Mock Complete"
+                transcriptTask = nil
+            }
+        }
+    }
+
+    private func mockTranscriptDelay(for token: String) -> UInt64 {
+        if token == "\n" {
+            return 240_000_000
+        }
+
+        if token.hasSuffix(".") || token.hasSuffix("!") || token.hasSuffix("?") {
+            return 180_000_000
+        }
+
+        if token.hasSuffix(",") {
+            return 130_000_000
+        }
+
+        return 90_000_000
+    }
+
+    private func toggleMockSpeakerTranscription() {
+        if isRecording {
+            stopMockSpeakerTranscription()
+        } else {
+            startMockSpeakerTranscription()
+        }
+    }
+
+    private func stopMockSpeakerTranscription() {
+        transcriptTask?.cancel()
+        transcriptTask = nil
+        isRecording = false
+        status = "Stopped"
+    }
+
+    private func requestMockAnswer() {
+        guard !transcript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            status = "No Transcript"
+            return
+        }
+
+        // Placeholder hook until backend turns transcript text into an actual answer flow.
+        status = "Answer Pending"
+    }
+
+    private func clearTranscript() {
+        transcriptTask?.cancel()
+        transcriptTask = nil
+        transcript = ""
+        isRecording = false
+        status = "Ready"
+    }
+
+    private func captureScreenshot() {
+        status = "Screenshot clicked"
+    }
+
+    private func triggerMimicType() {
+        status = "Mimic Type clicked"
+    }
+
+    private func beginMirrorWindowSetup() {
+        refreshMirrorExclusionApps()
+        contentMode = .mirrorSetup
+        status = "Select Exclusions"
+    }
+
+    private func dismissMirrorWindowSetup() {
+        contentMode = .transcript
+        status = mirrorSelectionStatus
+    }
+
+    private func refreshMirrorExclusionApps() {
+        let apps = MirrorExclusionApp.availableExclusions()
+        let availableIDs = Set(apps.map(\.id))
+        let preservedSelections = excludedMirrorAppIDs.intersection(availableIDs)
+        let alwaysExcludedIDs = Set(apps.filter(\.isAlwaysExcluded).map(\.id))
+
+        mirrorExclusionApps = apps
+
+        excludedMirrorAppIDs = preservedSelections.union(alwaysExcludedIDs)
+    }
+
+    private func toggleMirrorExclusion(for app: MirrorExclusionApp) {
+        guard !app.isAlwaysExcluded else { return }
+
+        if excludedMirrorAppIDs.contains(app.id) {
+            excludedMirrorAppIDs.remove(app.id)
+        } else {
+            excludedMirrorAppIDs.insert(app.id)
+        }
+    }
+
+    private var mirrorSelectionSummary: String {
+        let count = excludedMirrorAppIDs.count
+        if count == 1 {
+            return "1 app selected"
+        } else {
+            return "\(count) apps selected"
+        }
+    }
+
+    private var mirrorSelectionStatus: String {
+        let count = excludedMirrorAppIDs.count
+        if count == 0 {
+            return "Mirror Ready"
+        } else if count == 1 {
+            return "1 App Excluded"
+        } else {
+            return "\(count) Apps Excluded"
+        }
+    }
+
+    private func createMirrorWindow() {
+        // Future hook: backend will use the selected app ids to launch the
+        // real mirrored-screen flow and exclude these apps from capture.
+        status = "Mirror Create Pending"
     }
 }
 
-enum StealthButtonKind {
-    case normal
-    case primary
-    case danger
+private struct ActionButton: View {
+    let presentation: ActionButtonPresentation
+    let perform: () -> Void
+    var controlSize: ControlSize = .regular
+
+    var body: some View {
+        Button {
+            perform()
+        } label: {
+            ActionButtonLabel(presentation: presentation)
+        }
+        .frame(width: presentation.width)
+        .buttonStyle(.bordered)
+        .controlSize(controlSize)
+    }
 }
 
-struct StealthButtonStyle: ButtonStyle {
-    var kind: StealthButtonKind = .normal
-    var active: Bool = false
+private struct ActionButtonRow: View {
+    let actions: [OverlayAction]
+    let presentation: (OverlayAction) -> ActionButtonPresentation
+    let perform: (OverlayAction) -> Void
 
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(.system(size: 12, weight: .semibold))
-            .foregroundStyle(foregroundColor(configuration: configuration))
-            .padding(.horizontal, 14)
-            .padding(.vertical, 7)
-            .frame(minWidth: 74)
+    var body: some View {
+        HStack(spacing: 8) {
+            ForEach(actions) { action in
+                ActionButton(
+                    presentation: presentation(action),
+                    perform: { perform(action) }
+                )
+            }
+
+            Spacer(minLength: 0)
+        }
+    }
+}
+
+private struct ActionButtonLabel: View {
+    let presentation: ActionButtonPresentation
+
+    var body: some View {
+        Label(presentation.title, systemImage: presentation.systemImage)
+            .font(.system(size: 12, weight: .regular))
+            .imageScale(.medium)
+            .lineLimit(1)
+            .frame(maxWidth: .infinity)
+    }
+}
+
+private struct MirrorExclusionAppRow: View {
+    let app: MirrorExclusionApp
+    let isSelected: Bool
+    let toggle: () -> Void
+
+    var body: some View {
+        Group {
+            if app.isAlwaysExcluded {
+                rowContent
+            } else {
+                Button {
+                    toggle()
+                } label: {
+                    rowContent
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private var rowContent: some View {
+        HStack(spacing: 10) {
+            MirrorExclusionAppIcon(icon: app.icon)
+
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 6) {
+                    Text(app.name)
+                        .font(.system(size: 13, weight: .regular))
+                        .foregroundStyle(Color(nsColor: .labelColor))
+                        .lineLimit(1)
+
+                    if app.isCurrentApp {
+                        badge("This App")
+                    }
+
+                    if app.isAlwaysExcluded {
+                        badge("Always Excluded")
+                    }
+                }
+
+                if let bundleIdentifier = app.bundleIdentifier {
+                    Text(bundleIdentifier)
+                        .font(.caption)
+                        .foregroundStyle(Color(nsColor: .secondaryLabelColor))
+                        .lineLimit(1)
+                }
+            }
+
+            Spacer(minLength: 0)
+
+            Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                .font(.system(size: 15, weight: .medium))
+                .foregroundStyle(
+                    isSelected
+                        ? Color(nsColor: .controlAccentColor)
+                        : Color(nsColor: .tertiaryLabelColor)
+                )
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(
+                    isSelected
+                        ? Color(nsColor: .controlAccentColor).opacity(0.08)
+                        : Color.clear
+                )
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(
+                    Color(nsColor: .separatorColor).opacity(isSelected ? 0.3 : 0.12),
+                    lineWidth: 1
+                )
+        )
+    }
+
+    private func badge(_ title: String) -> some View {
+        Text(title)
+            .font(.system(size: 10, weight: .medium))
+            .foregroundStyle(Color(nsColor: .secondaryLabelColor))
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
             .background(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(backgroundFill(configuration: configuration))
+                Capsule(style: .continuous)
+                    .fill(Color(nsColor: .controlBackgroundColor))
             )
-            .overlay(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .stroke(borderColor(configuration: configuration), lineWidth: 1)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 7, style: .continuous)
-                    .stroke(innerHighlightColor(configuration: configuration), lineWidth: 1)
-                    .padding(1)
-            )
-            .shadow(
-                color: Color.black.opacity(configuration.isPressed ? 0.08 : 0.18),
-                radius: 0,
-                x: 0,
-                y: 1
-            )
-            .offset(y: configuration.isPressed ? 1 : 0)
-            .animation(.easeOut(duration: 0.08), value: configuration.isPressed)
     }
+}
 
-    private func foregroundColor(configuration: Configuration) -> Color {
-        switch kind {
-        case .primary where active:
-            return Color(red: 0.31, green: 0.09, blue: 0.09)
-        case .danger:
-            return Color(red: 0.20, green: 0.18, blue: 0.16)
-        case .primary, .normal:
-            return Color(red: 0.18, green: 0.18, blue: 0.16)
+private struct MirrorExclusionAppIcon: View {
+    let icon: NSImage?
+
+    var body: some View {
+        Group {
+            if let icon {
+                Image(nsImage: icon)
+                    .resizable()
+                    .interpolation(.high)
+            } else {
+                Image(systemName: "app.fill")
+                    .resizable()
+                    .scaledToFit()
+                    .foregroundStyle(Color(nsColor: .secondaryLabelColor))
+                    .padding(4)
+            }
         }
+        .frame(width: 22, height: 22)
+        .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+    }
+}
+
+private struct TranscriptTextView: NSViewRepresentable {
+    var text: String
+
+    private static let textInsets = NSSize(width: 10, height: 10)
+    private static let trailingGutter: CGFloat = 10
+    private static let font = NSFont.systemFont(ofSize: 14)
+    private static let textColor = NSColor.labelColor
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
     }
 
-    private func backgroundFill(configuration: Configuration) -> LinearGradient {
-        switch kind {
-        case .primary where active:
-            return LinearGradient(
-                colors: [
-                    Color(
-                        red: configuration.isPressed ? 0.84 : 0.95,
-                        green: configuration.isPressed ? 0.50 : 0.68,
-                        blue: configuration.isPressed ? 0.49 : 0.70
-                    ),
-                    Color(
-                        red: configuration.isPressed ? 0.58 : 0.72,
-                        green: configuration.isPressed ? 0.22 : 0.28,
-                        blue: configuration.isPressed ? 0.20 : 0.27
-                    ),
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-        case .danger:
-            return LinearGradient(
-                colors: [
-                    Color(
-                        red: configuration.isPressed ? 0.79 : 0.90,
-                        green: configuration.isPressed ? 0.78 : 0.88,
-                        blue: configuration.isPressed ? 0.73 : 0.82
-                    ),
-                    Color(
-                        red: configuration.isPressed ? 0.63 : 0.74,
-                        green: configuration.isPressed ? 0.62 : 0.71,
-                        blue: configuration.isPressed ? 0.58 : 0.64
-                    ),
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-        case .primary, .normal:
-            return LinearGradient(
-                colors: [
-                    Color(
-                        red: configuration.isPressed ? 0.83 : 0.95,
-                        green: configuration.isPressed ? 0.83 : 0.94,
-                        blue: configuration.isPressed ? 0.79 : 0.90
-                    ),
-                    Color(
-                        red: configuration.isPressed ? 0.68 : 0.78,
-                        green: configuration.isPressed ? 0.68 : 0.77,
-                        blue: configuration.isPressed ? 0.65 : 0.72
-                    ),
-                ],
-                startPoint: .top,
-                endPoint: .bottom
+    func makeNSView(context: Context) -> NSScrollView {
+        let scrollView = NSScrollView()
+        scrollView.drawsBackground = false
+        scrollView.borderType = .noBorder
+        scrollView.hasVerticalScroller = true
+        scrollView.hasHorizontalScroller = false
+        scrollView.autohidesScrollers = true
+        scrollView.scrollerStyle = .overlay
+        scrollView.contentView.postsBoundsChangedNotifications = true
+
+        let textView = NSTextView(frame: NSRect(origin: .zero, size: scrollView.contentSize))
+        textView.isEditable = false
+        textView.isSelectable = false
+        textView.drawsBackground = false
+        textView.font = Self.font
+        textView.textColor = Self.textColor
+        textView.textContainerInset = Self.textInsets
+        textView.textContainer?.lineFragmentPadding = 0
+        textView.textContainer?.widthTracksTextView = true
+        textView.textContainer?.containerSize = NSSize(
+            width: Self.containerWidth(for: scrollView.contentSize.width),
+            height: CGFloat.greatestFiniteMagnitude
+        )
+        textView.minSize = NSSize(width: 0, height: scrollView.contentSize.height)
+        textView.isVerticallyResizable = true
+        textView.isHorizontallyResizable = false
+        textView.autoresizingMask = [.width]
+        textView.maxSize = NSSize(
+            width: CGFloat.greatestFiniteMagnitude,
+            height: CGFloat.greatestFiniteMagnitude
+        )
+        Self.applyStyledText(text, to: textView)
+
+        scrollView.documentView = textView
+
+        context.coordinator.installObservers(for: scrollView)
+        return scrollView
+    }
+
+    func updateNSView(_ scrollView: NSScrollView, context: Context) {
+        guard let textView = scrollView.documentView as? NSTextView else { return }
+
+        let coordinator = context.coordinator
+        let shouldFollowLatest = coordinator.shouldFollowLatest || coordinator.isNearBottom(scrollView)
+        let contentSize = scrollView.contentSize
+
+        if textView.frame.width != contentSize.width {
+            textView.setFrameSize(NSSize(width: contentSize.width, height: textView.frame.height))
+        }
+
+        textView.minSize = NSSize(width: 0, height: contentSize.height)
+        textView.textContainer?.containerSize = NSSize(
+            width: Self.containerWidth(for: contentSize.width),
+            height: CGFloat.greatestFiniteMagnitude
+        )
+
+        if textView.string != text {
+            Self.applyStyledText(text, to: textView)
+        }
+
+        if let textContainer = textView.textContainer,
+            let layoutManager = textView.layoutManager {
+            layoutManager.ensureLayout(for: textContainer)
+        }
+
+        coordinator.shouldFollowLatest = shouldFollowLatest
+
+        guard shouldFollowLatest, !text.isEmpty else { return }
+
+        coordinator.scrollToBottom(in: scrollView, animated: true)
+    }
+
+    static func dismantleNSView(_ scrollView: NSScrollView, coordinator: Coordinator) {
+        coordinator.removeObservers()
+    }
+
+    private static func containerWidth(for contentWidth: CGFloat) -> CGFloat {
+        max(0, contentWidth - (textInsets.width * 2) - trailingGutter)
+    }
+
+    private static func applyStyledText(_ text: String, to textView: NSTextView) {
+        let paragraphStyle = NSMutableParagraphStyle()
+        paragraphStyle.lineBreakMode = .byWordWrapping
+        paragraphStyle.lineSpacing = 3
+
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: font,
+            .foregroundColor: textColor,
+            .paragraphStyle: paragraphStyle,
+        ]
+
+        textView.textStorage?.setAttributedString(
+            NSAttributedString(string: text, attributes: attributes)
+        )
+    }
+
+    final class Coordinator: NSObject {
+        private let bottomThreshold: CGFloat = 24
+        private var observedClipView: NSClipView?
+        var shouldFollowLatest = true
+
+        func installObservers(for scrollView: NSScrollView) {
+            removeObservers()
+            observedClipView = scrollView.contentView
+            NotificationCenter.default.addObserver(
+                self,
+                selector: #selector(handleBoundsChange),
+                name: NSView.boundsDidChangeNotification,
+                object: scrollView.contentView
             )
         }
-    }
 
-    private func borderColor(configuration: Configuration) -> Color {
-        switch kind {
-        case .primary where active:
-            return Color(
-                red: configuration.isPressed ? 0.39 : 0.47,
-                green: configuration.isPressed ? 0.10 : 0.12,
-                blue: configuration.isPressed ? 0.10 : 0.11
-            )
-        case .danger:
-            return Color(
-                red: configuration.isPressed ? 0.36 : 0.43,
-                green: configuration.isPressed ? 0.35 : 0.40,
-                blue: configuration.isPressed ? 0.31 : 0.34
-            )
-        case .primary, .normal:
-            return Color(
-                red: configuration.isPressed ? 0.39 : 0.46,
-                green: configuration.isPressed ? 0.39 : 0.44,
-                blue: configuration.isPressed ? 0.35 : 0.39
-            )
+        func removeObservers() {
+            if let observedClipView {
+                NotificationCenter.default.removeObserver(
+                    self,
+                    name: NSView.boundsDidChangeNotification,
+                    object: observedClipView
+                )
+            }
+            observedClipView = nil
         }
-    }
 
-    private func innerHighlightColor(configuration: Configuration) -> Color {
-        switch kind {
-        case .primary where active:
-            return Color.white.opacity(configuration.isPressed ? 0.22 : 0.40)
-        case .danger:
-            return Color.white.opacity(configuration.isPressed ? 0.24 : 0.46)
-        case .primary, .normal:
-            return Color.white.opacity(configuration.isPressed ? 0.28 : 0.54)
+        func isNearBottom(_ scrollView: NSScrollView) -> Bool {
+            let visibleMaxY = scrollView.contentView.bounds.maxY
+            let documentHeight = scrollView.documentView?.bounds.height ?? 0
+            return documentHeight - visibleMaxY <= bottomThreshold
+        }
+
+        func scrollToBottom(in scrollView: NSScrollView, animated: Bool) {
+            guard let documentView = scrollView.documentView else { return }
+
+            let targetY = max(0, documentView.bounds.height - scrollView.contentView.bounds.height)
+            let targetPoint = NSPoint(x: 0, y: targetY)
+
+            if animated {
+                NSAnimationContext.runAnimationGroup { context in
+                    context.duration = 0.16
+                    context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+                    scrollView.contentView.animator().setBoundsOrigin(targetPoint)
+                } completionHandler: {
+                    scrollView.reflectScrolledClipView(scrollView.contentView)
+                }
+            } else {
+                scrollView.contentView.setBoundsOrigin(targetPoint)
+                scrollView.reflectScrolledClipView(scrollView.contentView)
+            }
+        }
+
+        @objc private func handleBoundsChange(_ notification: Notification) {
+            guard let clipView = notification.object as? NSClipView,
+                let scrollView = clipView.superview as? NSScrollView else { return }
+
+            shouldFollowLatest = isNearBottom(scrollView)
+        }
+
+        deinit {
+            removeObservers()
         }
     }
 }
@@ -431,6 +816,6 @@ struct ContentView_Previews: PreviewProvider {
     static var previews: some View {
         ContentView(showsWindowBounds: true)
             .frame(width: 420, height: 300)
-            .background(Color.gray.opacity(0.18))
+            .background(Color(nsColor: .windowBackgroundColor))
     }
 }
