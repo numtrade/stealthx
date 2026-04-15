@@ -1,5 +1,12 @@
 .DS_Store
 DerivedData/
+build/
+.build/
+*.app
+*.dSYM
+*.dSYM.zip
+*.xcarchive
+*.xcresult
 
 # Xcode user-specific state
 *.xcuserstate

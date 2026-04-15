@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		99C000012FEF01000041629C /* AppModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99C000022FEF01000041629C /* AppModels.swift */; };
 		996792F22F8BB2870041629C /* stealthxApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 996792F12F8BB2870041629C /* stealthxApp.swift */; };
 		996792F42F8BB2870041629C /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 996792F32F8BB2870041629C /* ContentView.swift */; };
 		996792F62F8BB2890041629C /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 996792F52F8BB2890041629C /* Assets.xcassets */; };
@@ -15,6 +16,7 @@
 
 /* Begin PBXFileReference section */
 		996792EE2F8BB2870041629C /* stealthx.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = stealthx.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		99C000022FEF01000041629C /* AppModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModels.swift; sourceTree = "<group>"; };
 		996792F12F8BB2870041629C /* stealthxApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = stealthxApp.swift; sourceTree = "<group>"; };
 		996792F32F8BB2870041629C /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		996792F52F8BB2890041629C /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -52,6 +54,7 @@
 		996792F02F8BB2870041629C /* stealthx */ = {
 			isa = PBXGroup;
 			children = (
+				99C000022FEF01000041629C /* AppModels.swift */,
 				996792F12F8BB2870041629C /* stealthxApp.swift */,
 				996792F32F8BB2870041629C /* ContentView.swift */,
 				996792F52F8BB2890041629C /* Assets.xcassets */,
@@ -139,6 +142,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				99C000012FEF01000041629C /* AppModels.swift in Sources */,
 				996792F42F8BB2870041629C /* ContentView.swift in Sources */,
 				996792F22F8BB2870041629C /* stealthxApp.swift in Sources */,
 			);
