@@ -338,7 +338,8 @@ enum MimicTypeError: LocalizedError {
 
 @MainActor
 final class MimicTypeController: ObservableObject {
-    private static let startupDelaySeconds = "2.0"
+    private static let startupDelaySeconds: TimeInterval = 2.0
+    private static let overlayReturnDelaySeconds: TimeInterval = 2.25
     private static let inputDirectory = FileManager.default.homeDirectoryForCurrentUser
         .appendingPathComponent(".stealthx", isDirectory: true)
         .appendingPathComponent("tmp", isDirectory: true)
@@ -353,6 +354,8 @@ final class MimicTypeController: ObservableObject {
     private weak var hiddenOverlayWindow: NSWindow?
     private var hiddenOverlayWindowLevel: NSWindow.Level = .normal
     private var hiddenOverlayWindowWasVisible = false
+    private var overlayWasShownDuringTyping = false
+    private var overlayRestoreTask: Task<Void, Never>?
 
     func toggleTyping(statusHandler: @escaping (String) -> Void) {
         if isRunning {
@@ -384,13 +387,17 @@ final class MimicTypeController: ObservableObject {
         let errorPipe = Pipe()
         let process = Process()
         process.executableURL = pythonURL
-        process.arguments = [
+        var arguments = [
             scriptURL.path,
             "--file",
             inputFileURL.path,
             "--startup-delay",
-            Self.startupDelaySeconds,
+            String(Self.startupDelaySeconds),
         ]
+        if isVimModeEnabled {
+            arguments.append("--vim")
+        }
+        process.arguments = arguments
         process.standardError = errorPipe
 
         stopRequested = false
@@ -435,6 +442,7 @@ final class MimicTypeController: ObservableObject {
 
         self.process = process
         self.isRunning = true
+        scheduleOverlayWindowReturn()
         statusHandler("Typing Clipboard")
     }
 
@@ -545,25 +553,52 @@ final class MimicTypeController: ObservableObject {
     }
 
     private func hideOverlayWindowForTyping() {
+        overlayRestoreTask?.cancel()
+        overlayRestoreTask = nil
+
         guard let window = NSApp.windows.first(where: \.isVisible) else { return }
 
         hiddenOverlayWindow = window
         hiddenOverlayWindowLevel = window.level
         hiddenOverlayWindowWasVisible = window.isVisible
+        overlayWasShownDuringTyping = false
         window.orderOut(nil)
     }
 
     private func restoreOverlayWindowAfterTyping() {
+        overlayRestoreTask?.cancel()
+        overlayRestoreTask = nil
+
         guard let window = hiddenOverlayWindow else { return }
 
-        window.level = hiddenOverlayWindowLevel
-
-        if hiddenOverlayWindowWasVisible {
+        if hiddenOverlayWindowWasVisible && !overlayWasShownDuringTyping {
+            window.level = hiddenOverlayWindowLevel
             window.orderFrontRegardless()
-            NSApp.activate(ignoringOtherApps: true)
         }
 
         hiddenOverlayWindow = nil
         hiddenOverlayWindowWasVisible = false
+        overlayWasShownDuringTyping = false
+    }
+
+    private func scheduleOverlayWindowReturn() {
+        guard hiddenOverlayWindowWasVisible else { return }
+
+        overlayRestoreTask = Task { @MainActor [weak self] in
+            let delayNanoseconds =
+                UInt64(Self.overlayReturnDelaySeconds * 1_000_000_000)
+            try? await Task.sleep(nanoseconds: delayNanoseconds)
+
+            guard let self, self.process?.isRunning == true else { return }
+            self.showOverlayWindowDuringTyping()
+        }
+    }
+
+    private func showOverlayWindowDuringTyping() {
+        guard let window = hiddenOverlayWindow else { return }
+
+        window.level = hiddenOverlayWindowLevel
+        window.orderFrontRegardless()
+        overlayWasShownDuringTyping = true
     }
 }

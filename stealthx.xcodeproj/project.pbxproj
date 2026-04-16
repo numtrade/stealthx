@@ -7,23 +7,23 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		99C000012FEF01000041629C /* AppModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99C000022FEF01000041629C /* AppModels.swift */; };
-		99D100012FF001000041629C /* mimic_type.py in Resources */ = {isa = PBXBuildFile; fileRef = 99D100022FF001000041629C /* mimic_type.py */; };
 		996792F22F8BB2870041629C /* stealthxApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 996792F12F8BB2870041629C /* stealthxApp.swift */; };
 		996792F42F8BB2870041629C /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 996792F32F8BB2870041629C /* ContentView.swift */; };
 		996792F62F8BB2890041629C /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 996792F52F8BB2890041629C /* Assets.xcassets */; };
 		996792F92F8BB2890041629C /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 996792F82F8BB2890041629C /* Preview Assets.xcassets */; };
+		99C000012FEF01000041629C /* AppModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99C000022FEF01000041629C /* AppModels.swift */; };
+		99D100012FF001000041629C /* mimic_type.py in Resources */ = {isa = PBXBuildFile; fileRef = 99D100022FF001000041629C /* mimic_type.py */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		996792EE2F8BB2870041629C /* stealthx.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = stealthx.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		99C000022FEF01000041629C /* AppModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModels.swift; sourceTree = "<group>"; };
-		99D100022FF001000041629C /* mimic_type.py */ = {isa = PBXFileReference; lastKnownFileType = text.script.python; path = mimic_type.py; sourceTree = "<group>"; };
 		996792F12F8BB2870041629C /* stealthxApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = stealthxApp.swift; sourceTree = "<group>"; };
 		996792F32F8BB2870041629C /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		996792F52F8BB2890041629C /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		996792F82F8BB2890041629C /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
 		996792FA2F8BB2890041629C /* stealthx.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = stealthx.entitlements; sourceTree = "<group>"; };
+		99C000022FEF01000041629C /* AppModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModels.swift; sourceTree = "<group>"; };
+		99D100022FF001000041629C /* mimic_type.py */ = {isa = PBXFileReference; lastKnownFileType = text.script.python; path = mimic_type.py; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -41,7 +41,7 @@
 			isa = PBXGroup;
 			children = (
 				996792F02F8BB2870041629C /* stealthx */,
-				99D100032FF001000041629C /* Scripts */,
+				99D100032FF001000041629C /* scripts */,
 				996792EF2F8BB2870041629C /* Products */,
 			);
 			sourceTree = "<group>";
@@ -75,7 +75,7 @@
 			path = "Preview Content";
 			sourceTree = "<group>";
 		};
-		99D100032FF001000041629C /* Scripts */ = {
+		99D100032FF001000041629C /* scripts */ = {
 			isa = PBXGroup;
 			children = (
 				99D100022FF001000041629C /* mimic_type.py */,
@@ -115,6 +115,7 @@
 				TargetAttributes = {
 					996792ED2F8BB2870041629C = {
 						CreatedOnToolsVersion = 15.1;
+						LastSwiftMigration = 1510;
 					};
 				};
 			};
@@ -286,6 +287,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = stealthx/stealthx.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
@@ -303,6 +305,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = projecthalley.org.stealthx;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
 			};
 			name = Debug;
@@ -312,6 +315,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = stealthx/stealthx.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;

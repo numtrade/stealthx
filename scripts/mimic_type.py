@@ -14,6 +14,21 @@ def delete_autoclose():
     keyboard.release(Key.delete)
     time.sleep(random.uniform(0.1, 0.15))
 
+def clear_vim_autoindent():
+    """Keep the new line in Vim, then clear only the auto-inserted indent."""
+    keyboard.press(Key.esc)
+    keyboard.release(Key.esc)
+    time.sleep(random.uniform(0.05, 0.1))
+
+    keyboard.press('0')
+    keyboard.release('0')
+    time.sleep(random.uniform(0.03, 0.06))
+
+    with keyboard.pressed(Key.shift):
+        keyboard.press('c')
+        keyboard.release('c')
+    time.sleep(random.uniform(0.08, 0.16))
+
 def simulate_typo(char, i, error_chance):
     """Simulates human typing errors with contextual awareness"""
     if random.random() < error_chance and char.isalnum():
@@ -48,7 +63,7 @@ def simulate_typo(char, i, error_chance):
         return (i, False)
     return (i, False)
 
-def type_simulation(text):
+def type_simulation(text, vim_mode=False):
     # Delay bands are tuned to feel like fast but imperfect manual typing.
     base_speed = (0.07, 0.18)        # 70-180ms per character
     punctuation_delay = (0.2, 0.4)   # After , ; : etc
@@ -66,11 +81,16 @@ def type_simulation(text):
             keyboard.press(Key.enter)
             keyboard.release(Key.enter)
             time.sleep(random.uniform(*linebreak_delay))
-            
-            # Reset to true line start
-            with keyboard.pressed(Key.shift):
-                keyboard.press(Key.home)
-                keyboard.release(Key.home)
+
+            if vim_mode:
+                # Vim handles a normal-mode line change more reliably than
+                # Shift+Home-style navigation inside terminal sessions.
+                clear_vim_autoindent()
+            else:
+                # Reset to true line start
+                with keyboard.pressed(Key.shift):
+                    keyboard.press(Key.home)
+                    keyboard.release(Key.home)
             time.sleep(random.uniform(0.1, 0.2))
             i += 1
             continue
@@ -129,6 +149,11 @@ def parse_args():
         default=0.35,
         help="Seconds to wait before typing begins.",
     )
+    parser.add_argument(
+        "--vim",
+        action="store_true",
+        help="Use Vim-specific newline recovery instead of Shift+Home.",
+    )
     return parser.parse_args()
 
 def main():
@@ -147,7 +172,7 @@ def main():
         time.sleep(args.startup_delay)
 
     print("Professional typing simulation starting...")
-    type_simulation(text)
+    type_simulation(text, vim_mode=args.vim)
     print("Typing simulation completed.")
 
 if __name__ == "__main__":
