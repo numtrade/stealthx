@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		99C000012FEF01000041629C /* AppModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99C000022FEF01000041629C /* AppModels.swift */; };
+		99D100012FF001000041629C /* mimic_type.py in Resources */ = {isa = PBXBuildFile; fileRef = 99D100022FF001000041629C /* mimic_type.py */; };
 		996792F22F8BB2870041629C /* stealthxApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 996792F12F8BB2870041629C /* stealthxApp.swift */; };
 		996792F42F8BB2870041629C /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 996792F32F8BB2870041629C /* ContentView.swift */; };
 		996792F62F8BB2890041629C /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 996792F52F8BB2890041629C /* Assets.xcassets */; };
@@ -17,6 +18,7 @@
 /* Begin PBXFileReference section */
 		996792EE2F8BB2870041629C /* stealthx.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = stealthx.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		99C000022FEF01000041629C /* AppModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModels.swift; sourceTree = "<group>"; };
+		99D100022FF001000041629C /* mimic_type.py */ = {isa = PBXFileReference; lastKnownFileType = text.script.python; path = mimic_type.py; sourceTree = "<group>"; };
 		996792F12F8BB2870041629C /* stealthxApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = stealthxApp.swift; sourceTree = "<group>"; };
 		996792F32F8BB2870041629C /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		996792F52F8BB2890041629C /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -39,6 +41,7 @@
 			isa = PBXGroup;
 			children = (
 				996792F02F8BB2870041629C /* stealthx */,
+				99D100032FF001000041629C /* Scripts */,
 				996792EF2F8BB2870041629C /* Products */,
 			);
 			sourceTree = "<group>";
@@ -70,6 +73,14 @@
 				996792F82F8BB2890041629C /* Preview Assets.xcassets */,
 			);
 			path = "Preview Content";
+			sourceTree = "<group>";
+		};
+		99D100032FF001000041629C /* Scripts */ = {
+			isa = PBXGroup;
+			children = (
+				99D100022FF001000041629C /* mimic_type.py */,
+			);
+			path = scripts;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -130,6 +141,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				99D100012FF001000041629C /* mimic_type.py in Resources */,
 				996792F92F8BB2890041629C /* Preview Assets.xcassets in Resources */,
 				996792F62F8BB2890041629C /* Assets.xcassets in Resources */,
 			);

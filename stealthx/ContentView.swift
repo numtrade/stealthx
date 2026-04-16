@@ -9,6 +9,7 @@ private enum ContentMode {
 struct ContentView: View {
     var showsWindowBounds = false
 
+    @StateObject private var mimicTypeController = MimicTypeController()
     @State private var transcript = ""
     @State private var isRecording = false
     @State private var status = "Ready"
@@ -270,6 +271,7 @@ struct ContentView: View {
     private func actionPresentation(for action: OverlayAction) -> ActionButtonPresentation {
         action.presentation(
             isRecording: isRecording,
+            isMimicTyping: mimicTypeController.isRunning,
             primaryWidth: actionButtonWidth,
             secondaryWidth: secondaryActionButtonWidth
         )
@@ -278,6 +280,7 @@ struct ContentView: View {
     private func headerActionPresentation(for action: OverlayAction) -> ActionButtonPresentation {
         action.presentation(
             isRecording: isRecording,
+            isMimicTyping: mimicTypeController.isRunning,
             primaryWidth: actionButtonWidth,
             secondaryWidth: headerActionButtonWidth
         )
@@ -433,7 +436,9 @@ struct ContentView: View {
     }
 
     private func triggerMimicType() {
-        status = "Mimic Type clicked"
+        mimicTypeController.toggleTyping { nextStatus in
+            status = nextStatus
+        }
     }
 
     private func beginMirrorWindowSetup() {

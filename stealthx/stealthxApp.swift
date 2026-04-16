@@ -24,6 +24,7 @@ struct StealthxApp: App {
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
+        ActiveApplicationTracker.shared.start()
         NSApp.setActivationPolicy(.accessory)
 
         DispatchQueue.main.async {
