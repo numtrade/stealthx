@@ -10,6 +10,7 @@ struct ContentView: View {
     var showsWindowBounds = false
 
     @StateObject private var mimicTypeController = MimicTypeController()
+    @StateObject private var mirrorWindowController = MirrorWindowController()
     @State private var transcript = ""
     @State private var isRecording = false
     @State private var status = "Ready"
@@ -220,8 +221,8 @@ struct ContentView: View {
                     .foregroundStyle(secondaryTextColor)
                     .lineLimit(1)
 
-                Button("Create Mirror") {
-                    createMirrorWindow()
+                Button(mirrorSetupButtonTitle) {
+                    toggleMirrorFromSetup()
                 }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.small)
@@ -292,6 +293,7 @@ struct ContentView: View {
         action.presentation(
             isRecording: isRecording,
             isMimicTyping: mimicTypeController.isRunning,
+            isMirrorRunning: mirrorWindowController.isRunning,
             primaryWidth: actionButtonWidth,
             secondaryWidth: secondaryActionButtonWidth
         )
@@ -301,6 +303,7 @@ struct ContentView: View {
         action.presentation(
             isRecording: isRecording,
             isMimicTyping: mimicTypeController.isRunning,
+            isMirrorRunning: mirrorWindowController.isRunning,
             primaryWidth: actionButtonWidth,
             secondaryWidth: headerActionButtonWidth
         )
@@ -321,7 +324,7 @@ struct ContentView: View {
         case .mimicType:
             triggerMimicType()
         case .mirrorWindow:
-            beginMirrorWindowSetup()
+            triggerMirrorWindow()
         }
     }
 
@@ -514,9 +517,45 @@ struct ContentView: View {
     }
 
     private func createMirrorWindow() {
-        // Future hook: backend will use the selected app ids to launch the
-        // real mirrored-screen flow and exclude these apps from capture.
-        status = "Mirror Create Pending"
+        let selectedBundleIDs = mirrorExclusionApps
+            .filter { excludedMirrorAppIDs.contains($0.id) }
+            .compactMap(\.bundleIdentifier)
+
+        mirrorWindowController.createOrUpdateMirror(excludingBundleIDs: selectedBundleIDs) { nextStatus in
+            status = nextStatus
+            if nextStatus == "Mirror Running" {
+                contentMode = .transcript
+            }
+        }
+    }
+
+    private var mirrorSetupButtonTitle: String {
+        mirrorWindowController.isRunning ? "Stop Mirror" : "Create Mirror"
+    }
+
+    private func triggerMirrorWindow() {
+        if mirrorWindowController.isRunning {
+            stopMirrorWindow(shouldDismissSetup: true)
+        } else {
+            beginMirrorWindowSetup()
+        }
+    }
+
+    private func toggleMirrorFromSetup() {
+        if mirrorWindowController.isRunning {
+            stopMirrorWindow(shouldDismissSetup: false)
+        } else {
+            createMirrorWindow()
+        }
+    }
+
+    private func stopMirrorWindow(shouldDismissSetup: Bool) {
+        mirrorWindowController.stopMirror { nextStatus in
+            status = nextStatus
+            if shouldDismissSetup {
+                contentMode = .transcript
+            }
+        }
     }
 }
 
