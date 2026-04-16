@@ -124,7 +124,8 @@ def type_simulation(text, vim_mode=False):
 
         # Some editors insert the closing pair automatically, so remove the
         # synthetic duplicate to keep the final text aligned with the source.
-        if char in ('(', '{', '['):
+        # Terminal Vim does not need this branch.
+        if not vim_mode and char in ('(', '{', '['):
             time.sleep(random.uniform(0.25, 0.35))  # Editor response window
             delete_autoclose()
             # Handle following space if needed
