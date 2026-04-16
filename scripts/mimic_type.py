@@ -4,6 +4,9 @@ import time
 import random
 from pynput.keyboard import Controller, Key
 
+# Suggestion: if this ships inside stealthx, move the runtime configuration
+# into CLI flags or environment variables so the app can choose the source file,
+# startup delay, and typing profile without editing the script.
 # A single controller instance keeps all synthetic key events on the same device.
 keyboard = Controller()
 
@@ -54,6 +57,10 @@ def type_simulation(text):
     structural_delay = (0.3, 0.6)    # After { ( [
     linebreak_delay = (0.4, 0.8)     # After Enter
     error_chance = 0.05              # 5% error rate
+
+    # Suggestion: add a kill-switch check inside this loop, such as watching for
+    # a sentinel file or a stop flag from the parent process, so a runaway typing
+    # session can be interrupted without forcing logout or shutdown.
     
     i = 0
     while i < len(text):
@@ -106,6 +113,9 @@ def type_simulation(text):
         if char in ('(', '{', '['):
             time.sleep(random.uniform(0.25, 0.35))  # Editor response window
             delete_autoclose()
+            # Suggestion: make bracket auto-close handling optional per target
+            # editor because some text fields do not insert matching pairs and a
+            # forced delete could remove real content.
             # Handle following space if needed
             if i+1 < len(text) and text[i+1] == ' ':
                 time.sleep(random.uniform(0.15, 0.25))
@@ -117,12 +127,17 @@ def type_simulation(text):
 
 def main():
     file_path = os.path.expanduser("~/.macunix/tmp/txt/clip.txt")
+    # Suggestion: prefer an argparse-based --file / --stdin interface here so
+    # the same helper can work for local clipboard text, app-passed temp files,
+    # and future transcript/answer payloads without hardcoding ~/.macunix paths.
     if not os.path.exists(file_path):
         print(f"ERROR: File not found: {file_path}")
         return
     
     # The helper intentionally reads from a file so the producer side can drop
     # in clipboard contents before the typing pass begins.
+    # Suggestion: open with encoding="utf-8" and explicit error handling so the
+    # failure mode is clear if the incoming text contains unexpected bytes.
     with open(file_path, "r") as file:
         text = file.read()
     
