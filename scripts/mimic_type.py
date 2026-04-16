@@ -4,6 +4,7 @@ import time
 import random
 from pynput.keyboard import Controller, Key
 
+# A single controller instance keeps all synthetic key events on the same device.
 keyboard = Controller()
 
 def delete_autoclose():
@@ -40,12 +41,14 @@ def simulate_typo(char, i, error_chance):
                     keyboard.press(Key.backspace)
                     keyboard.release(Key.backspace)
                     time.sleep(random.uniform(0.08, 0.15))
+                # Rewind the cursor position so the caller retries from the
+                # earlier character after the deliberate over-correction.
                 return (i - possible_N, True)
         return (i, False)
     return (i, False)
 
 def type_simulation(text):
-    # Professional typing parameters (70-80 WPM)
+    # Delay bands are tuned to feel like fast but imperfect manual typing.
     base_speed = (0.07, 0.18)        # 70-180ms per character
     punctuation_delay = (0.2, 0.4)   # After , ; : etc
     structural_delay = (0.3, 0.6)    # After { ( [
@@ -56,7 +59,8 @@ def type_simulation(text):
     while i < len(text):
         char = text[i]
 
-        # Handle newlines with editor accommodation
+        # Newlines need extra recovery time because editors often auto-indent or
+        # move the caret unexpectedly after Enter.
         if char == '\n':
             keyboard.press(Key.enter)
             keyboard.release(Key.enter)
@@ -70,7 +74,8 @@ def type_simulation(text):
             i += 1
             continue
 
-        # Handle tabs with editor response time
+        # Tabs are sent as real Tab key events so the target editor can keep its
+        # normal indentation behavior.
         if char == '\t':
             keyboard.press(Key.tab)
             keyboard.release(Key.tab)
@@ -87,7 +92,8 @@ def type_simulation(text):
         keyboard.press(char)
         keyboard.release(char)
         
-        # Apply context-aware delays
+        # Punctuation and structural characters usually introduce a visible
+        # pause in real typing, so they get their own timing profile.
         if char in {',', ';', ':'}:
             time.sleep(random.uniform(*punctuation_delay))
         elif char in {'{', '(', '['}:
@@ -95,7 +101,8 @@ def type_simulation(text):
         else:
             time.sleep(random.uniform(*base_speed))
 
-        # Handle auto-closing brackets
+        # Some editors insert the closing pair automatically, so remove the
+        # synthetic duplicate to keep the final text aligned with the source.
         if char in ('(', '{', '['):
             time.sleep(random.uniform(0.25, 0.35))  # Editor response window
             delete_autoclose()
@@ -114,6 +121,8 @@ def main():
         print(f"ERROR: File not found: {file_path}")
         return
     
+    # The helper intentionally reads from a file so the producer side can drop
+    # in clipboard contents before the typing pass begins.
     with open(file_path, "r") as file:
         text = file.read()
     
