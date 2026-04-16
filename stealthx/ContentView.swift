@@ -24,7 +24,6 @@ struct ContentView: View {
     private let secondaryActionButtonWidth: CGFloat = 126
     private let headerActionButtonWidth: CGFloat = 142
     private let primaryActions = OverlayAction.primaryRow
-    private let secondaryActions = OverlayAction.secondaryRow
     // Mock speaker-side transcript until backend wires live system-audio transcription.
     private let mockSpeakerTranscriptParagraphs = [
         "Starting speaker-output transcription demo so the backend team can see the intended flow clearly.",
@@ -52,11 +51,7 @@ struct ContentView: View {
                         perform: perform
                     )
 
-                    ActionButtonRow(
-                        actions: secondaryActions,
-                        presentation: actionPresentation(for:),
-                        perform: perform
-                    )
+                    secondaryActionRow
                 }
             }
             .padding(14)
@@ -176,6 +171,31 @@ struct ContentView: View {
             RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .stroke(panelStroke, lineWidth: 1)
         )
+    }
+
+    private var secondaryActionRow: some View {
+        HStack(spacing: 8) {
+            ActionButton(
+                presentation: actionPresentation(for: .captureScreenshot),
+                perform: { perform(.captureScreenshot) }
+            )
+
+            HStack(spacing: 10) {
+                ActionButton(
+                    presentation: actionPresentation(for: .mimicType),
+                    perform: { perform(.mimicType) }
+                )
+
+                Toggle("Vim", isOn: $mimicTypeController.isVimModeEnabled)
+                    .toggleStyle(.checkbox)
+                    .font(.system(size: 12, weight: .regular))
+                    .foregroundStyle(primaryTextColor)
+                    .disabled(mimicTypeController.isRunning)
+                    .help("Reserve this for Vim-specific mimic typing behavior.")
+            }
+
+            Spacer(minLength: 0)
+        }
     }
 
     private var isShowingMirrorSetup: Bool {

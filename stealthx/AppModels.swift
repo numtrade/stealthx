@@ -346,6 +346,7 @@ final class MimicTypeController: ObservableObject {
     private static let inputFileURL = inputDirectory.appendingPathComponent("clip.txt")
 
     @Published private(set) var isRunning = false
+    @Published var isVimModeEnabled = false
 
     private var process: Process?
     private var stopRequested = false
