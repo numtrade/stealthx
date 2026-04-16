@@ -9,6 +9,7 @@ private enum ContentMode {
 struct ContentView: View {
     var showsWindowBounds = false
 
+    @StateObject private var mimicTypeController = MimicTypeController()
     @State private var transcript = ""
     @State private var isRecording = false
     @State private var status = "Ready"
@@ -23,7 +24,6 @@ struct ContentView: View {
     private let secondaryActionButtonWidth: CGFloat = 126
     private let headerActionButtonWidth: CGFloat = 142
     private let primaryActions = OverlayAction.primaryRow
-    private let secondaryActions = OverlayAction.secondaryRow
     // Mock speaker-side transcript until backend wires live system-audio transcription.
     private let mockSpeakerTranscriptParagraphs = [
         "Starting speaker-output transcription demo so the backend team can see the intended flow clearly.",
@@ -51,11 +51,7 @@ struct ContentView: View {
                         perform: perform
                     )
 
-                    ActionButtonRow(
-                        actions: secondaryActions,
-                        presentation: actionPresentation(for:),
-                        perform: perform
-                    )
+                    secondaryActionRow
                 }
             }
             .padding(14)
@@ -177,6 +173,31 @@ struct ContentView: View {
         )
     }
 
+    private var secondaryActionRow: some View {
+        HStack(spacing: 8) {
+            ActionButton(
+                presentation: actionPresentation(for: .captureScreenshot),
+                perform: { perform(.captureScreenshot) }
+            )
+
+            HStack(spacing: 10) {
+                ActionButton(
+                    presentation: actionPresentation(for: .mimicType),
+                    perform: { perform(.mimicType) }
+                )
+
+                Toggle("Vim", isOn: $mimicTypeController.isVimModeEnabled)
+                    .toggleStyle(.checkbox)
+                    .font(.system(size: 12, weight: .regular))
+                    .foregroundStyle(primaryTextColor)
+                    .disabled(mimicTypeController.isRunning)
+                    .help("Reserve this for Vim-specific mimic typing behavior.")
+            }
+
+            Spacer(minLength: 0)
+        }
+    }
+
     private var isShowingMirrorSetup: Bool {
         contentMode == .mirrorSetup
     }
@@ -270,6 +291,7 @@ struct ContentView: View {
     private func actionPresentation(for action: OverlayAction) -> ActionButtonPresentation {
         action.presentation(
             isRecording: isRecording,
+            isMimicTyping: mimicTypeController.isRunning,
             primaryWidth: actionButtonWidth,
             secondaryWidth: secondaryActionButtonWidth
         )
@@ -278,6 +300,7 @@ struct ContentView: View {
     private func headerActionPresentation(for action: OverlayAction) -> ActionButtonPresentation {
         action.presentation(
             isRecording: isRecording,
+            isMimicTyping: mimicTypeController.isRunning,
             primaryWidth: actionButtonWidth,
             secondaryWidth: headerActionButtonWidth
         )
@@ -433,7 +456,9 @@ struct ContentView: View {
     }
 
     private func triggerMimicType() {
-        status = "Mimic Type clicked"
+        mimicTypeController.toggleTyping { nextStatus in
+            status = nextStatus
+        }
     }
 
     private func beginMirrorWindowSetup() {
