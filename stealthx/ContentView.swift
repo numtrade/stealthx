@@ -98,6 +98,17 @@ struct ContentView: View {
         }
     }
 
+    private var quitButton: some View {
+        Button(role: .destructive) {
+            quitApplication()
+        } label: {
+            Label("Quit", systemImage: "power")
+                .font(.system(size: 12, weight: .regular))
+        }
+        .buttonStyle(.bordered)
+        .controlSize(.small)
+    }
+
     private var transcriptHeaderView: some View {
         HStack(spacing: 8) {
             Circle()
@@ -116,6 +127,8 @@ struct ContentView: View {
                 controlSize: .small
             )
             .layoutPriority(1)
+
+            quitButton
 
             Text(status)
                 .font(.caption)
@@ -141,6 +154,8 @@ struct ContentView: View {
                 .foregroundStyle(primaryTextColor)
 
             Spacer()
+
+            quitButton
 
             Text("Exclude Apps")
                 .font(.caption)
@@ -553,6 +568,24 @@ struct ContentView: View {
             if shouldDismissSetup {
                 contentMode = .transcript
             }
+        }
+    }
+
+    private func quitApplication() {
+        status = "Quitting"
+
+        transcriptTask?.cancel()
+        transcriptTask = nil
+        isRecording = false
+
+        mimicTypeController.forceStopForAppQuit()
+
+        if mirrorWindowController.isRunning {
+            mirrorWindowController.stopMirror { _ in
+                NSApp.terminate(nil)
+            }
+        } else {
+            NSApp.terminate(nil)
         }
     }
 }
