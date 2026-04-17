@@ -22,7 +22,7 @@ The intended flow is:
 
 ## Planned actions
 
-Two buttons in the current UI are placeholders for later work:
+Two buttons in the current UI are placeholders have been implemented:
 
 - `Screenshot`: capture the current screen or relevant visible content
 - `Mimic Type`: type whatever text is currently held in the clipboard
