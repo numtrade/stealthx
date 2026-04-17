@@ -1097,6 +1097,20 @@ final class MimicTypeController: ObservableObject {
         process.terminate()
     }
 
+    func forceStopForAppQuit() {
+        overlayRestoreTask?.cancel()
+        overlayRestoreTask = nil
+
+        if let process, process.isRunning {
+            process.terminate()
+        }
+
+        process = nil
+        stopRequested = false
+        isRunning = false
+        restoreOverlayWindowAfterTyping()
+    }
+
     private func prepareInputFile() throws -> URL {
         guard
             let text = NSPasteboard.general.string(forType: .string)?
