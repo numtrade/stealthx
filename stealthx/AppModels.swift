@@ -445,6 +445,7 @@ final class MirrorViewController: NSViewController {
     private let shouldRenderCursor: Bool
     private let cursorHotSpot: NSPoint
     private var cursorTimer: Timer?
+    private var acceptsFrames = true
 
     init(
         displayFrame: CGRect,
@@ -500,7 +501,16 @@ final class MirrorViewController: NSViewController {
         cursorTimer?.invalidate()
     }
 
+    func beginShutdown() {
+        acceptsFrames = false
+        cursorTimer?.invalidate()
+        cursorTimer = nil
+        cursorView.isHidden = true
+        surfaceView.layer?.contents = nil
+    }
+
     func present(_ image: CGImage) {
+        guard acceptsFrames else { return }
         surfaceView.present(image)
         updateCursorOverlay()
     }
@@ -593,7 +603,9 @@ final class MirrorStreamOutput: NSObject, SCStreamOutput {
         }
 
         Task { @MainActor [weak self] in
-            self?.controller?.present(cgImage)
+            guard let self else { return }
+            guard !self.stopping() else { return }
+            self.controller?.present(cgImage)
         }
     }
 }
@@ -644,6 +656,11 @@ final class MirrorWindowController: NSObject, ObservableObject, NSWindowDelegate
         isStopping = true
         output?.beginStopping()
         isRunning = false
+
+        if let controller = window?.contentViewController as? MirrorViewController {
+            controller.beginShutdown()
+        }
+
         window?.orderOut(nil)
 
         let streamToStop = stream
