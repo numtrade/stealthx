@@ -710,22 +710,34 @@ final class MirrorWindowController: NSObject, ObservableObject, NSWindowDelegate
             shouldRenderCursor: showCursor
         )
 
-        let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 1280, height: 820),
-            styleMask: [.titled, .closable, .miniaturizable, .resizable],
-            backing: .buffered,
-            defer: false
-        )
-        window.center()
-        window.title = "Presentation Display"
-        window.collectionBehavior = [.canJoinAllSpaces, .fullScreenPrimary]
-        window.tabbingMode = .disallowed
-        window.titleVisibility = .visible
-        window.titlebarAppearsTransparent = false
-        window.contentViewController = controller
-        window.delegate = self
-        window.makeKeyAndOrderFront(nil)
-        window.standardWindowButton(.zoomButton)?.isEnabled = true
+        let window: NSWindow
+        if let existingWindow = self.window {
+            window = existingWindow
+            window.contentViewController = controller
+            window.delegate = self
+            window.title = "Presentation Display"
+            window.makeKeyAndOrderFront(nil)
+        } else {
+            let newWindow = NSWindow(
+                contentRect: NSRect(x: 0, y: 0, width: 1280, height: 820),
+                styleMask: [.titled, .closable, .miniaturizable, .resizable],
+                backing: .buffered,
+                defer: false
+            )
+            newWindow.center()
+            newWindow.title = "Presentation Display"
+            newWindow.collectionBehavior = [.canJoinAllSpaces, .fullScreenPrimary]
+            newWindow.tabbingMode = .disallowed
+            newWindow.titleVisibility = .visible
+            newWindow.titlebarAppearsTransparent = false
+            newWindow.contentViewController = controller
+            newWindow.delegate = self
+            newWindow.standardWindowButton(.zoomButton)?.isEnabled = true
+            newWindow.makeKeyAndOrderFront(nil)
+            self.window = newWindow
+            window = newWindow
+        }
+
         self.window = window
 
         let filter = SCContentFilter(
@@ -822,7 +834,8 @@ final class MirrorWindowController: NSObject, ObservableObject, NSWindowDelegate
             return false
         }
 
-        return !isStopping
+        sender.orderOut(nil)
+        return false
     }
 
     private func stopStream(_ stream: SCStream) async throws {
@@ -849,11 +862,7 @@ final class MirrorWindowController: NSObject, ObservableObject, NSWindowDelegate
         output = nil
         stream = nil
 
-        if let window {
-            window.delegate = nil
-            window.close()
-        }
-        window = nil
+        window?.orderOut(nil)
 
         statusHandler(finalStatus)
     }
