@@ -24,11 +24,6 @@ Options:
   --no-open               Do not open the app after installing it
   --keep-quarantine       Do not remove the quarantine xattr
   --help                  Show this help
-
-Examples:
-  ./install-built-app.sh
-  ./install-built-app.sh --release
-  ./install-built-app.sh --destination "$HOME/Applications/stealthx.app"
 EOF
 }
 
@@ -44,18 +39,12 @@ while [[ $# -gt 0 ]]; do
             ;;
         --configuration)
             CONFIGURATION="${2:-}"
-            if [[ -z "$CONFIGURATION" ]]; then
-                echo "ERROR: --configuration requires a value." >&2
-                exit 1
-            fi
+            [[ -n "$CONFIGURATION" ]] || { echo "ERROR: --configuration requires a value." >&2; exit 1; }
             shift 2
             ;;
         --destination)
             DESTINATION="${2:-}"
-            if [[ -z "$DESTINATION" ]]; then
-                echo "ERROR: --destination requires a value." >&2
-                exit 1
-            fi
+            [[ -n "$DESTINATION" ]] || { echo "ERROR: --destination requires a value." >&2; exit 1; }
             shift 2
             ;;
         --no-open)
@@ -95,6 +84,14 @@ echo "  Source: ${SOURCE_APP}"
 echo "  Destination: ${DESTINATION}"
 
 mkdir -p "$(dirname "$DESTINATION")"
+
+if pgrep -x "$PRODUCT_NAME" >/dev/null 2>&1; then
+    echo "Quitting running app..."
+    pkill -x "$PRODUCT_NAME" || true
+    sleep 1
+fi
+
+rm -rf "$DESTINATION"
 ditto "$SOURCE_APP" "$DESTINATION"
 
 if [[ "$CLEAR_QUARANTINE" -eq 1 ]]; then
