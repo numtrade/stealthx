@@ -105,8 +105,9 @@ struct ContentView: View {
             Label("Quit", systemImage: "power")
                 .font(.system(size: 12, weight: .regular))
         }
-        .buttonStyle(.bordered)
+        .buttonStyle(.borderedProminent)
         .controlSize(.small)
+        .tint(.red)
     }
 
     private var transcriptHeaderView: some View {
