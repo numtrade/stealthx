@@ -228,9 +228,40 @@ enum ScreenshotCaptureService {
         .appendingPathComponent(".stealthx", isDirectory: true)
         .appendingPathComponent("tmp", isDirectory: true)
         .appendingPathComponent("screenshot", isDirectory: true)
+
     static let outputFileURL = outputDirectory.appendingPathComponent("screenshot.png")
 
-    static func capture() throws {
+    private struct WindowSnapshot {
+        let window: NSWindow
+        let level: NSWindow.Level
+    }
+
+    @MainActor
+    static func captureAndCopyToClipboardExcludingStealthXWindows() async throws {
+        let windowsToHide = NSApp.windows
+            .filter { $0.isVisible }
+            .map { WindowSnapshot(window: $0, level: $0.level) }
+
+        hideWindows(windowsToHide)
+
+        // Give WindowServer a moment to update compositing after hiding.
+        try? await Task.sleep(nanoseconds: 250_000_000)
+
+        do {
+            try await Task.detached(priority: .userInitiated) {
+                try captureToFile()
+            }.value
+
+            try copyToClipboard()
+        } catch {
+            restoreWindows(windowsToHide)
+            throw error
+        }
+
+        restoreWindows(windowsToHide)
+    }
+
+    private static func captureToFile() throws {
         let fileManager = FileManager.default
         try fileManager.createDirectory(
             at: outputDirectory,
@@ -271,7 +302,7 @@ enum ScreenshotCaptureService {
     }
 
     @MainActor
-    static func copyToClipboard() throws {
+    private static func copyToClipboard() throws {
         guard let image = NSImage(contentsOf: outputFileURL) else {
             throw NSError(
                 domain: "ScreenshotCaptureService",
@@ -292,6 +323,25 @@ enum ScreenshotCaptureService {
                 code: 3,
                 userInfo: [NSLocalizedDescriptionKey: "Could not copy screenshot to clipboard"]
             )
+        }
+    }
+
+    @MainActor
+    private static func hideWindows(_ snapshots: [WindowSnapshot]) {
+        for snapshot in snapshots {
+            snapshot.window.orderOut(nil)
+        }
+    }
+
+    @MainActor
+    private static func restoreWindows(_ snapshots: [WindowSnapshot]) {
+        for snapshot in snapshots {
+            snapshot.window.level = snapshot.level
+            snapshot.window.orderFrontRegardless()
+        }
+
+        if !snapshots.isEmpty {
+            NSApp.activate(ignoringOtherApps: true)
         }
     }
 }
@@ -790,16 +840,25 @@ final class MirrorWindowController: NSObject, ObservableObject, NSWindowDelegate
 
         let display = content.displays[displayIndex]
         let requestedBundleIDs = Set(excludingBundleIDs)
-        var excludedApplications = content.applications.filter {
-            requestedBundleIDs.contains($0.bundleIdentifier)
+
+        var excludedApplications = content.applications.filter { application in
+            requestedBundleIDs.contains(application.bundleIdentifier)
         }
+
         let missingBundleIDs = requestedBundleIDs.subtracting(
             Set(excludedApplications.map(\.bundleIdentifier))
         ).sorted()
 
         let currentPID = ProcessInfo.processInfo.processIdentifier
-        let ownApplication = content.applications.first { $0.processID == currentPID }
+        let currentBundleID = Bundle.main.bundleIdentifier ?? ""
+
+        let ownApplication = content.applications.first { application in
+            application.processID == currentPID
+                || application.bundleIdentifier == currentBundleID
+        }
+
         let ownApplicationMatched = ownApplication != nil
+
         if let ownApplication {
             excludedApplications.append(ownApplication)
         }

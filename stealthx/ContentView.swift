@@ -442,12 +442,10 @@ struct ContentView: View {
 
         Task {
             do {
-                try await Task.detached(priority: .userInitiated) {
-                    try ScreenshotCaptureService.capture()
-                }.value
+                try await ScreenshotCaptureService
+                    .captureAndCopyToClipboardExcludingStealthXWindows()
 
-                try await MainActor.run {
-                    try ScreenshotCaptureService.copyToClipboard()
+                await MainActor.run {
                     status = "Screenshot Copied"
                 }
             } catch {
