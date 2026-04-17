@@ -543,13 +543,15 @@ final class MirrorViewController: NSViewController {
     }
 }
 
-final class MirrorStreamOutput: NSObject, SCStreamOutput, SCStreamDelegate {
+final class MirrorStreamOutput: NSObject, SCStreamOutput {
     let outputQueue = DispatchQueue(label: "stealthx.mirror.output")
 
     private let ciContext = CIContext()
     private weak var controller: MirrorViewController?
     private let displayFrame: CGRect
     private let excludedProcessIDs: Set<pid_t>
+    private let stateQueue = DispatchQueue(label: "stealthx.mirror.output.state")
+    private var isStopping = false
 
     init(controller: MirrorViewController, displayFrame: CGRect, excludedProcessIDs: Set<pid_t>) {
         self.controller = controller
@@ -557,8 +559,14 @@ final class MirrorStreamOutput: NSObject, SCStreamOutput, SCStreamDelegate {
         self.excludedProcessIDs = excludedProcessIDs
     }
 
-    func stream(_ stream: SCStream, didStopWithError error: Error) {
-        fputs("[mirror] capture stream stopped: \(error)\n", stderr)
+    func beginStopping() {
+        stateQueue.sync {
+            isStopping = true
+        }
+    }
+
+    private func stopping() -> Bool {
+        stateQueue.sync { isStopping }
     }
 
     func stream(
@@ -567,6 +575,7 @@ final class MirrorStreamOutput: NSObject, SCStreamOutput, SCStreamDelegate {
         of outputType: SCStreamOutputType
     ) {
         guard outputType == .screen else { return }
+        guard !stopping() else { return }
         guard CMSampleBufferIsValid(sampleBuffer) else { return }
         guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
         guard
@@ -590,7 +599,7 @@ final class MirrorStreamOutput: NSObject, SCStreamOutput, SCStreamDelegate {
 }
 
 @MainActor
-final class MirrorWindowController: NSObject, ObservableObject, NSWindowDelegate {
+final class MirrorWindowController: NSObject, ObservableObject, NSWindowDelegate, SCStreamDelegate {
     private let displayIndex = 0
     private let fps = 12
     private let showCursor = true
@@ -600,6 +609,9 @@ final class MirrorWindowController: NSObject, ObservableObject, NSWindowDelegate
     private var stream: SCStream?
     private var output: MirrorStreamOutput?
     private var window: NSWindow?
+    private var shutdownTask: Task<Void, Never>?
+    private var isStopping = false
+    private let stopQueue = DispatchQueue(label: "stealthx.mirror.stop")
 
     func createOrUpdateMirror(
         excludingBundleIDs: [String],
@@ -620,22 +632,50 @@ final class MirrorWindowController: NSObject, ObservableObject, NSWindowDelegate
     }
 
     func stopMirror(statusHandler: @escaping (String) -> Void) {
+        guard !isStopping else { return }
         statusHandler("Stopping Mirror")
 
-        Task { @MainActor in
+        guard let stream else {
+            isRunning = false
+            finishMirrorShutdown(statusHandler: statusHandler, finalStatus: "Mirror Stopped")
+            return
+        }
+
+        isStopping = true
+        output?.beginStopping()
+        isRunning = false
+        window?.orderOut(nil)
+
+        let streamToStop = stream
+
+        shutdownTask = Task { [weak self] in
             do {
-                try await stopCapture()
-                statusHandler("Mirror Stopped")
-            } catch let error as MirrorWindowError {
-                statusHandler(error.statusText)
+                guard let self else { return }
+                try await self.stopStream(streamToStop)
+
+                await MainActor.run {
+                    self.finishMirrorShutdown(
+                        statusHandler: statusHandler,
+                        finalStatus: "Mirror Stopped"
+                    )
+                }
             } catch {
-                statusHandler("Mirror Failed")
+                await MainActor.run {
+                    guard let self else { return }
+                    self.finishMirrorShutdown(
+                        statusHandler: statusHandler,
+                        finalStatus: "Mirror Failed"
+                    )
+                }
             }
         }
     }
 
     private func start(excludingBundleIDs: [String]) async throws {
-        try await stopCapture()
+        if let shutdownTask {
+            await shutdownTask.value
+            self.shutdownTask = nil
+        }
 
         let content = try await SCShareableContent.excludingDesktopWindows(
             false,
@@ -689,7 +729,7 @@ final class MirrorWindowController: NSObject, ObservableObject, NSWindowDelegate
             displayFrame: selection.display.frame,
             excludedProcessIDs: excludedProcessIDs
         )
-        let stream = SCStream(filter: filter, configuration: configuration, delegate: output)
+        let stream = SCStream(filter: filter, configuration: configuration, delegate: self)
         self.output = output
         self.stream = stream
 
@@ -755,32 +795,50 @@ final class MirrorWindowController: NSObject, ObservableObject, NSWindowDelegate
         return unique
     }
 
-    private func stopCapture() async throws {
-        if let stream {
-            do {
-                try await stream.stopCapture()
-            } catch {
-                throw MirrorWindowError.startFailed(error.localizedDescription)
+    nonisolated func stream(_ stream: SCStream, didStopWithError error: Error) {
+        fputs("[mirror] capture stream stopped: \(error)\n", stderr)
+    }
+
+    func windowShouldClose(_ sender: NSWindow) -> Bool {
+        if isRunning && !isStopping {
+            stopMirror { _ in }
+            return false
+        }
+
+        return !isStopping
+    }
+
+    private func stopStream(_ stream: SCStream) async throws {
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            stopQueue.async {
+                stream.stopCapture { error in
+                    if let error {
+                        continuation.resume(throwing: error)
+                    } else {
+                        continuation.resume(returning: ())
+                    }
+                }
             }
         }
+    }
+
+    private func finishMirrorShutdown(
+        statusHandler: @escaping (String) -> Void,
+        finalStatus: String
+    ) {
+        shutdownTask = nil
+        isStopping = false
 
         output = nil
         stream = nil
+
         if let window {
             window.delegate = nil
             window.close()
         }
         window = nil
-        isRunning = false
-    }
 
-    func windowWillClose(_ notification: Notification) {
-        Task { @MainActor in
-            self.output = nil
-            self.stream = nil
-            self.window = nil
-            self.isRunning = false
-        }
+        statusHandler(finalStatus)
     }
 }
 
