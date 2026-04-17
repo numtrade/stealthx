@@ -1,0 +1,59 @@
+name: Build macOS app
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build-macos:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Show Xcode version
+        run: xcodebuild -version
+
+      - name: Build app
+        run: |
+          xcodebuild \
+            -project stealthx.xcodeproj \
+            -scheme stealthx \
+            -configuration Release \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+
+      - name: Find built app
+        run: |
+          APP_PATH="$(find build/Build/Products -maxdepth 2 -name 'stealthx.app' -print -quit)"
+          if [ -z "$APP_PATH" ]; then
+            echo "stealthx.app not found"
+            exit 1
+          fi
+          echo "APP_PATH=$APP_PATH" >> "$GITHUB_ENV"
+
+      - name: Package DMG
+        run: |
+          mkdir -p dist
+          ditto "$APP_PATH" "dist/stealthx.app"
+          hdiutil create \
+            -volname "stealthx" \
+            -srcfolder "dist/stealthx.app" \
+            -ov -format UDZO \
+            "dist/stealthx.dmg"
+
+      - name: Upload app artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: stealthx-app
+          path: dist/stealthx.app
+
+      - name: Upload dmg artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: stealthx-dmg
+          path: dist/stealthx.dmg
